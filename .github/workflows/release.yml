@@ -1,0 +1,39 @@
+name: Release macOS App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --noconfirm --onefile --windowed --name "CleanDrive" main.py
+        cd dist
+        zip -r CleanDrive.zip CleanDrive.app
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: dist/CleanDrive.zip
+        token: ${{ secrets.GITHUB_TOKEN }}

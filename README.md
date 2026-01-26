@@ -14,10 +14,10 @@ A simple Python GUI tool for macOS to automatically remove `.DS_Store` and `._` 
 
 ## Download
 
-You can download the latest standalone version of the app from the **GitHub Actions** tab:
-1. Go to the "Actions" tab in this repository.
-2. Click on the latest "Build macOS App" workflow run.
-3. Scroll down to "Artifacts" and download `CleanDrive-macOS`.
+You can download the latest standalone version of the app from the **Releases** page:
+1. Go to the **Releases** section on the right side of the repository page.
+2. Click on the latest version (e.g., `v1.0`).
+3. Download `CleanDrive.zip`.
 4. Unzip the file to get `CleanDrive.app`.
 
 ## Installation & Running from Source
