@@ -138,12 +138,12 @@ class CleanerApp:
 
         self.log(f"--- FINISHED {mode} ---")
         self.log(f"Total processed: {total_success}, Failed: {total_fail}")
-        self.status_var.set(f"Finished. Success: {total_success}, Fail: {total_fail}")
 
-        # Re-enable buttons (must be done in main thread, but tkinter is somewhat thread-safe for config, better to use after)
-        self.root.after(0, self.enable_buttons)
+        # Re-enable buttons and update status (must be done in main thread)
+        self.root.after(0, lambda: self.finish_scan(total_success, total_fail))
 
-    def enable_buttons(self):
+    def finish_scan(self, success, fail):
+        self.status_var.set(f"Finished. Success: {success}, Fail: {fail}")
         self.preview_btn.config(state="normal")
         self.clean_btn.config(state="normal")
         self.refresh_btn.config(state="normal")
