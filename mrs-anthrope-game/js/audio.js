@@ -220,7 +220,7 @@
   };
   SONGS.concert = { bpm: 168, bars: SONGS.stage.bars, full: true, crowd: true, play: SONGS.stage.play };
 
-  function renderSong(mx, name, t0, t1) {
+  function renderSong(mx, name, t0, t1, loopMode) {
     var S = SONGS[name]; if (!S) return;
     var beat = 60 / S.bpm, barLen = beat * 4;
     var nb = S.bars.length;
@@ -232,14 +232,14 @@
       // render into a temp mixer so we can cut the song exactly at t1
       S.play(mx, { t: t, beat: beat, bar: k % nb, absBar: k, loop: Math.floor(k / nb), root: roots[0], roots: roots, full: S.full });
     }
-    if (S.crowd) crowdNoise(mx, t0, t1 - t0);
+    if (S.crowd) crowdNoise(mx, t0, t1 - t0, loopMode);
   }
-  function crowdNoise(mx, t0, dur) {
+  function crowdNoise(mx, t0, dur, flat) {
     var n = noiseFn(1234, 44100, 0.08), n2 = noiseFn(77, 44100, 0.02);
     render(mx, t0, dur, 0.5, 0, function (t) {
       var swell = 0.55 + 0.45 * Math.sin(t * 0.9) * Math.sin(t * 0.37 + 1);
       return (n() * 0.6 + n2() * 0.8) * swell;
-    }, function (t, d) { return Math.min(1, t / 0.6) * Math.min(1, (d - t) / 1.0); });
+    }, flat ? null : function (t, d) { return Math.min(1, t / 0.6) * Math.min(1, (d - t) / 1.0); });
   }
 
   // ------------------------------------------------------------------ SFX
@@ -311,6 +311,9 @@
         render(mx, t0, 0.6, 0.18, 0, pulseFn(880, 0.5, 0, -3), expEnv(0.2));
         crash(mx, t0, 0.5, s);
         break;
+      case 'pickup':
+        [72, 76, 79, 84, 88].forEach(function (m, i) { lead(mx, t0 + i * 0.05, 0.07, m, 0.2, 0, 0.5); });
+        break;
       case 'tick':
         render(mx, t0, 0.025, 0.12, 0, pulseFn(1760, 0.5), null);
         break;
@@ -346,6 +349,35 @@
     }
     var len = Math.ceil(totalFrames / fps * SR);
     return { sr: SR, L: L.subarray(0, len), R: R.subarray(0, len) };
+  };
+
+  // ---------------------------------------------------- realtime helpers (browser game)
+  function master(x, gain) { return Math.tanh(x * gain) * 0.9; }
+  MA.SFX_NAMES = ['hit', 'heavy', 'smash', 'swing', 'land', 'thud', 'scream', 'select', 'go', 'card', 'door', 'ko', 'tick', 'pickup'];
+  MA.renderSfxClip = function (name) {
+    var mx = new Mixer(2.6);
+    sfx(mx, name, 0.005);
+    var end = mx.n;
+    while (end > 1000 && Math.abs(mx.L[end - 1]) < 1e-4 && Math.abs(mx.R[end - 1]) < 1e-4) end--;
+    var L = new Float32Array(end), R = new Float32Array(end);
+    for (var k = 0; k < end; k++) { L[k] = master(mx.L[k], 1.2); R[k] = master(mx.R[k], 1.2); }
+    return { sr: SR, L: L, R: R };
+  };
+  var LOOP_BARS = { title: 8, stage: 16, boss: 8, concert: 8, clear: 4 };
+  // returns a seamlessly looping buffer (tails wrap around to the start); 'clear' plays once
+  MA.renderSongLoop = function (name) {
+    var S = SONGS[name], beat = 60 / S.bpm, len = LOOP_BARS[name] * beat * 4;
+    var mx = new Mixer(len + 3);
+    renderSong(mx, name, 0, len - 0.001, !S.once);
+    var n = S.once ? mx.n : Math.round(len * SR);
+    var L = new Float32Array(n), R = new Float32Array(n);
+    for (var k = 0; k < mx.n; k++) {
+      var j = S.once ? k : k % n;
+      if (j >= n) continue;
+      L[j] += mx.L[k]; R[j] += mx.R[k];
+    }
+    for (k = 0; k < n; k++) { L[k] = master(L[k], 0.95); R[k] = master(R[k], 0.95); }
+    return { sr: SR, L: L, R: R, loop: !S.once };
   };
 
   MA.encodeWav = function (a) {

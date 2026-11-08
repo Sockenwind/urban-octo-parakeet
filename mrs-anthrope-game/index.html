@@ -2,68 +2,328 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MRS. ANTHROPE - Stage 1: Road to the Gig</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MRS. ANTHROPE - Road to the Gig</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
-  body { display: flex; align-items: center; justify-content: center; }
-  canvas { image-rendering: pixelated; image-rendering: crisp-edges; width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; }
-  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px;
-    color: #f6ecd6; font: bold 22px monospace; letter-spacing: 2px; cursor: pointer; background: rgba(0, 0, 0, .55); text-align: center; }
-  #start small { font-size: 13px; color: #a5a9bf; letter-spacing: 1px; }
+  :root { --red: #e3241b; --green: #38d63c; --cream: #f6ecd6; --grey: #646982; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--cream); overflow: hidden;
+    font-family: ui-monospace, Menlo, Consolas, monospace; touch-action: none; user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #screen { display: block; image-rendering: pixelated; image-rendering: crisp-edges; aspect-ratio: 16 / 9; height: auto; background: #000;
+    width: min(100vw, calc((100vh - 40px) * 16 / 9)); width: min(100vw, calc((100dvh - 40px) * 16 / 9)); }
+  #help { font-size: 12px; line-height: 1.6; color: #a5a9bf; padding: 6px 10px; text-align: center; }
+  #help b { color: var(--cream); }
+  #controls { display: none; }
+  body.touch #help { display: none; }
+  body.touch #screen { width: min(100vw, calc(100vh * 16 / 9)); width: min(100vw, calc(100dvh * 16 / 9)); }
+  /* landscape: controls float over the picture */
+  body.touch #controls { display: flex; position: absolute; left: 0; right: 0; bottom: 0; justify-content: space-between; align-items: flex-end;
+    padding: 0 calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 14px);
+    pointer-events: none; }
+  body.touch #controls > * { pointer-events: auto; }
+  #pad { width: 150px; height: 150px; position: relative; opacity: .6; touch-action: none; }
+  #base { position: absolute; inset: 0; border-radius: 50%; border: 3px solid rgba(246, 236, 214, .55); background: rgba(0, 0, 0, .35); }
+  #base::before, #base::after { content: ''; position: absolute; background: rgba(246, 236, 214, .18); }
+  #base::before { left: 50%; top: 14%; bottom: 14%; width: 3px; margin-left: -1.5px; }
+  #base::after { top: 50%; left: 14%; right: 14%; height: 3px; margin-top: -1.5px; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff, #a5a9bf); border: 3px solid #000; }
+  #btns { position: relative; width: 200px; height: 160px; opacity: .65; }
+  .btn { position: absolute; border-radius: 50%; border: 3px solid #000; font: bold 14px ui-monospace, monospace; letter-spacing: 1px;
+    color: #000; box-shadow: inset 0 -6px 0 rgba(0, 0, 0, .35); padding: 0; touch-action: none; }
+  .btn.on { transform: scale(.9); filter: brightness(1.35); }
+  #bHit { width: 88px; height: 88px; right: 0; bottom: 8px; background: var(--red); color: var(--cream); font-size: 17px; }
+  #bJump { width: 70px; height: 70px; right: 98px; bottom: 0; background: var(--green); }
+  #bSp { width: 62px; height: 62px; right: 50px; bottom: 102px; background: var(--cream); }
+  #mid { display: flex; gap: 8px; margin-bottom: 4px; align-items: center; }
+  @media (orientation: landscape) {
+    body.touch #mid { position: absolute; left: calc(env(safe-area-inset-left) + 12px); bottom: calc(env(safe-area-inset-bottom) + 172px);
+      flex-direction: column; align-items: flex-start; gap: 6px; opacity: .7; }
+    body.touch #mid .small { padding: 5px 9px; font-size: 10px; }
+  }
+  .small { font: bold 11px ui-monospace, monospace; padding: 7px 11px; border-radius: 14px; border: 2px solid var(--grey);
+    background: rgba(0, 0, 0, .65); color: var(--cream); touch-action: none; }
+  .small.on { background: var(--grey); }
+  #rotate { display: none; font-size: 11px; color: #a5a9bf; text-align: center; }
+  /* portrait: picture on top, controller below */
+  @media (orientation: portrait) {
+    body.touch #app { justify-content: flex-start; }
+    body.touch #screen { width: 100vw; }
+    body.touch #controls { position: relative; flex: 1; width: 100%; align-items: center; flex-wrap: wrap; align-content: center;
+      padding: 10px 18px calc(env(safe-area-inset-bottom) + 18px); background: radial-gradient(ellipse at 50% 0%, #2a1010, #000 70%); }
+    body.touch #mid { order: -1; width: 100%; justify-content: center; margin: 4px 0 18px; }
+    body.touch #pad, body.touch #btns { opacity: 1; }
+    body.touch #rotate { display: block; width: 100%; order: 5; margin-top: 18px; }
+  }
+  #boot { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    background: rgba(0, 0, 0, .75); font: bold 16px ui-monospace, monospace; letter-spacing: 2px; text-align: center; }
+  #bar { width: 220px; height: 10px; border: 2px solid var(--cream); }
+  #bar i { display: block; height: 100%; width: 0; background: var(--red); }
 </style>
 </head>
 <body>
-<canvas id="screen" width="320" height="180"></canvas>
-<div id="start">&#9654; PRESS START<small>Klick oder Enter &ndash; mit Sound</small></div>
+<div id="app">
+  <canvas id="screen" width="320" height="180"></canvas>
+  <div id="help">
+    <b>Bewegen</b> Pfeiltasten / WASD &nbsp;·&nbsp; <b>Schlag</b> J oder Z/Y &nbsp;·&nbsp; <b>Sprung</b> K, X oder Leertaste
+    &nbsp;·&nbsp; <b>Spezial</b> L oder C &nbsp;·&nbsp; <b>Start/Pause</b> Enter &nbsp;·&nbsp; <b>Ton</b> M<br>
+    Sprung + Schlag = Flugkick &nbsp;·&nbsp; 3× Schlag = Combo &nbsp;·&nbsp; Gamepad wird unterstützt
+  </div>
+  <div id="controls">
+    <div id="pad"><div id="base"><div id="knob"></div></div></div>
+    <div id="mid">
+      <button class="small key" data-b="start" id="bStart">START</button>
+      <button class="small" id="bMute">TON AN</button>
+      <button class="small" id="bFull">VOLLBILD</button>
+    </div>
+    <div id="btns">
+      <button class="btn key" data-b="special" id="bSp">SP</button>
+      <button class="btn key" data-b="jump" id="bJump">JUMP</button>
+      <button class="btn key" data-b="attack" id="bHit">HIT</button>
+    </div>
+    <div id="rotate">Tipp: Handy quer halten für das große Bild</div>
+  </div>
+</div>
+<div id="boot"><div id="bootTxt">LOADING SOUND</div><div id="bar"><i></i></div></div>
+
 <script src="js/assets.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/game.js"></script>
 <script src="js/audio.js"></script>
 <script>
+(function () {
+  'use strict';
   MA.loadTitle();
   var cv = document.getElementById('screen'), ctx = cv.getContext('2d');
-  var img = ctx.createImageData(MA.W, MA.H), buf = new MA.Buf(MA.W, MA.H);
-  var overlay = document.getElementById('start');
-  var actx = null, audioBuf = null, game = null, t0 = 0, running = false;
+  var img = ctx.createImageData(MA.W, MA.H), fb = new MA.Buf(MA.W, MA.H);
+  var game = new MA.Game({ mode: 'play' });
+  var showFps = /fps/.test(location.search);
 
-  // show the title screen behind the overlay
-  (function preview() { var g = new MA.Game(); for (var i = 0; i < 40; i++) g.step(); g.render(buf); MA.toRGBA(buf, img.data, 0); ctx.putImageData(img, 0, 0); })();
+  // ------------------------------------------------------------ touch detection
+  var isTouch = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
+  function setTouch(on) { document.body.classList.toggle('touch', on); }
+  setTouch(isTouch);
+  window.addEventListener('touchstart', function () { if (!document.body.classList.contains('touch')) setTouch(true); }, { passive: true });
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
-  function start() {
-    if (running) return;
-    running = true;
-    overlay.innerHTML = 'LOADING&hellip;';
-    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-    actx.resume();
-    setTimeout(function () {
-      if (!audioBuf) {
-        var sim = new MA.Game();
-        while (!sim.done) sim.step();
-        var a = MA.renderAudio(sim.events, sim.frame, 60);
-        audioBuf = actx.createBuffer(2, a.L.length, a.sr);
-        audioBuf.getChannelData(0).set(a.L); audioBuf.getChannelData(1).set(a.R);
+  // ------------------------------------------------------------ sound
+  var SND = {
+    ctx: null, sfx: {}, songs: {}, cur: null, want: null, muted: false, ready: false, loading: false,
+    init: function () {
+      if (this.ctx || this.loading) return;
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { this.ready = true; return; }
+      var c = this.ctx = new AC();
+      c.resume && c.resume();
+      // iOS unlock with a silent buffer inside the gesture
+      var sb = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = sb; s.connect(c.destination); s.start(0);
+      this.out = c.createGain(); this.out.gain.value = this.muted ? 0 : 0.9;
+      var comp = c.createDynamicsCompressor(); comp.threshold.value = -8; comp.ratio.value = 6;
+      this.out.connect(comp); comp.connect(c.destination);
+      this.musicGain = c.createGain(); this.musicGain.gain.value = 0.75; this.musicGain.connect(this.out);
+      this.fxGain = c.createGain(); this.fxGain.gain.value = 0.9; this.fxGain.connect(this.out);
+      this.load();
+    },
+    toBuf: function (a) {
+      var b = this.ctx.createBuffer(2, a.L.length, a.sr);
+      b.getChannelData(0).set(a.L); b.getChannelData(1).set(a.R);
+      return b;
+    },
+    load: function () {
+      var self = this, tasks = [function () { MA.SFX_NAMES.forEach(function (n) { self.sfx[n] = self.toBuf(MA.renderSfxClip(n)); }); }];
+      ['title', 'boss', 'stage', 'clear', 'concert'].forEach(function (n) { tasks.push(function () { self.songs[n] = self.toBuf(MA.renderSongLoop(n)); }); });
+      var i = 0, boot = document.getElementById('boot'), bar = document.querySelector('#bar i');
+      this.loading = true; boot.style.display = 'flex';
+      (function next() {
+        if (i >= tasks.length) {
+          boot.style.display = 'none'; self.loading = false; self.ready = true;
+          self.music(game.musicName);
+          return;
+        }
+        tasks[i++]();
+        bar.style.width = Math.round(i / tasks.length * 100) + '%';
+        setTimeout(next, 16);
+      })();
+    },
+    play: function (name, delay) {
+      var b = this.sfx[name]; if (!b || !this.ready) return;
+      var s = this.ctx.createBufferSource(); s.buffer = b; s.connect(this.fxGain);
+      s.start(this.ctx.currentTime + Math.max(0, delay || 0));
+    },
+    music: function (name) {
+      this.want = name;
+      if (this.cur) { try { this.cur.stop(); } catch (e) { } this.cur = null; }
+      if (!name || !this.ready || !this.songs[name]) return;
+      var s = this.ctx.createBufferSource(); s.buffer = this.songs[name]; s.loop = name !== 'clear';
+      s.connect(this.musicGain); s.start(); this.cur = s;
+    },
+    setMuted: function (m) {
+      this.muted = m;
+      if (this.out) this.out.gain.value = m ? 0 : 0.9;
+      document.getElementById('bMute').textContent = m ? 'TON AUS' : 'TON AN';
+    },
+    running: true,
+    setRunning: function (r) {
+      if (!this.ctx || r === this.running) return;
+      this.running = r;
+      try { if (r) this.ctx.resume(); else this.ctx.suspend(); } catch (x) { }
+    }
+  };
+  function pumpEvents() {
+    var ev = game.events;
+    for (var i = 0; i < ev.length; i++) {
+      var e = ev[i];
+      if (e.type === 'sfx') SND.play(e.name, (e.f - game.frame) / 60);
+      else SND.music(e.name);
+    }
+    ev.length = 0;
+  }
+
+  // ------------------------------------------------------------ input
+  var held = {}, latch = {}, stick = { x: 0, y: 0 }, tap = false, tapX = 160;
+  function press(b) { held[b] = true; latch[b] = true; }
+  function release(b) { held[b] = false; }
+  function firstGesture() { if (!SND.ctx && !SND.loading) { SND.init(); } }
+  function vib() { if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) { } }
+
+  document.querySelectorAll('.key').forEach(function (el) {
+    var b = el.getAttribute('data-b');
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault(); firstGesture();
+      try { el.setPointerCapture(e.pointerId); } catch (x) { }
+      press(b); el.classList.add('on'); vib();
+    });
+    function up() { release(b); el.classList.remove('on'); }
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+  });
+
+  var pad = document.getElementById('pad'), base = document.getElementById('base'), knob = document.getElementById('knob'), padId = null;
+  function movePad(e) {
+    var r = base.getBoundingClientRect();
+    var dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    var len = Math.hypot(dx, dy), max = r.width / 2 - 12, dead = r.width * 0.12;
+    stick.x = (len > dead && Math.abs(dx) > len * 0.38) ? (dx < 0 ? -1 : 1) : 0;
+    stick.y = (len > dead && Math.abs(dy) > len * 0.38) ? (dy < 0 ? -1 : 1) : 0;
+    if (len > max) { dx *= max / len; dy *= max / len; }
+    knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+  }
+  pad.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); firstGesture();
+    padId = e.pointerId; try { pad.setPointerCapture(padId); } catch (x) { }
+    movePad(e);
+  });
+  pad.addEventListener('pointermove', function (e) { if (e.pointerId === padId) movePad(e); });
+  function endPad(e) { if (e.pointerId !== padId) return; padId = null; stick.x = stick.y = 0; knob.style.transform = ''; }
+  pad.addEventListener('pointerup', endPad); pad.addEventListener('pointercancel', endPad); pad.addEventListener('lostpointercapture', endPad);
+
+  cv.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); firstGesture();
+    var r = cv.getBoundingClientRect();
+    tap = true; tapX = (e.clientX - r.left) / r.width * MA.W;
+  });
+
+  var KEYS = {
+    ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
+    KeyJ: 'attack', KeyZ: 'attack', KeyY: 'attack', KeyK: 'jump', KeyX: 'jump', Space: 'jump', KeyL: 'special', KeyC: 'special',
+    Enter: 'start', KeyP: 'start', Escape: 'start'
+  };
+  window.addEventListener('keydown', function (e) {
+    if (e.code === 'KeyM') { firstGesture(); SND.setMuted(!SND.muted); return; }
+    var b = KEYS[e.code]; if (!b) return;
+    e.preventDefault(); firstGesture();
+    if (!e.repeat) press(b); else held[b] = true;
+  });
+  window.addEventListener('keyup', function (e) { var b = KEYS[e.code]; if (b) release(b); });
+  window.addEventListener('blur', function () { held = {}; });
+
+  document.getElementById('bMute').addEventListener('pointerdown', function (e) { e.preventDefault(); firstGesture(); SND.setMuted(!SND.muted); });
+  var bFull = document.getElementById('bFull'), de = document.documentElement;
+  var canFull = !!(de.requestFullscreen || de.webkitRequestFullscreen) && (document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  if (!canFull) bFull.style.display = 'none';
+  bFull.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); firstGesture();
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+      var p = (de.requestFullscreen || de.webkitRequestFullscreen).call(de);
+      if (p && p.then) p.then(function () { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () { }); }).catch(function () { bFull.style.display = 'none'; });
+    } catch (x) { bFull.style.display = 'none'; }
+  });
+
+  function pollPad() {
+    var o = {}, gps = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (var i = 0; i < gps.length; i++) {
+      var gp = gps[i]; if (!gp) continue;
+      var B = function (k) { return gp.buttons[k] && gp.buttons[k].pressed; };
+      var ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+      o.left = o.left || ax < -0.45 || B(14); o.right = o.right || ax > 0.45 || B(15);
+      o.up = o.up || ay < -0.45 || B(12); o.down = o.down || ay > 0.45 || B(13);
+      o.attack = o.attack || B(2) || B(3); o.jump = o.jump || B(0); o.special = o.special || B(1) || B(5);
+      o.start = o.start || B(9);
+      if (B(0) || B(2) || B(9)) firstGesture();
+    }
+    return o;
+  }
+  function readInput() {
+    var I = game.input, gp = pollPad();
+    I.left = held.left || latch.left || stick.x < 0 || gp.left;
+    I.right = held.right || latch.right || stick.x > 0 || gp.right;
+    I.up = held.up || latch.up || stick.y < 0 || gp.up;
+    I.down = held.down || latch.down || stick.y > 0 || gp.down;
+    I.attack = held.attack || latch.attack || gp.attack;
+    I.jump = held.jump || latch.jump || gp.jump;
+    I.special = held.special || latch.special || gp.special;
+    I.start = held.start || latch.start || gp.start;
+    I.tap = tap; game.tapX = tapX;
+  }
+
+  // some mobile browsers (iOS) only unlock audio on touchend / click: resume there as well
+  ['touchend', 'click', 'keyup'].forEach(function (ev) {
+    document.addEventListener(ev, function () {
+      if (!SND.ctx) return;
+      if (SND.ctx.state !== 'running' && SND.running) { try { SND.ctx.resume(); } catch (x) { } }
+    }, true);
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && game.canPause && !game.paused) game.paused = true;
+  });
+
+  // ------------------------------------------------------------ main loop (fixed 60 Hz)
+  var acc = 0, last = performance.now(), STEP = 1000 / 60, fpsT = 0, fpsN = 0, fps = 0;
+  function frame(now) {
+    var dt = Math.min(100, now - last); last = now;
+    if (!SND.loading) {
+      acc += dt;
+      var n = 0;
+      while (acc >= STEP && n < 4) {
+        readInput();
+        game.step();
+        latch = {}; tap = false;
+        pumpEvents();
+        if (game.restart) { SND.music(null); game = new MA.Game({ mode: 'play' }); }
+        acc -= STEP; n++;
       }
-      var src = actx.createBufferSource();
-      src.buffer = audioBuf; src.connect(actx.destination);
-      game = new MA.Game();
-      t0 = actx.currentTime + 0.1;
-      src.start(t0);
-      overlay.style.display = 'none';
-      requestAnimationFrame(loop);
-    }, 30);
-  }
-  function loop() {
-    var target = Math.floor((actx.currentTime - t0) * 60);
-    while (game.frame < target && !game.done) game.step();
-    game.render(buf);
-    MA.toRGBA(buf, img.data, game.fadeLevel());
+      if (n === 4) acc = 0;
+    }
+    SND.setRunning(!game.paused && !document.hidden);
+    game.render(fb);
+    if (showFps) {
+      fpsN++; if (now - fpsT > 500) { fps = Math.round(fpsN * 1000 / (now - fpsT)); fpsN = 0; fpsT = now; }
+      fb.text(fps + ' FPS', 2, 172, MA.C.Y, { outline: MA.C.K });
+    }
+    MA.toRGBA(fb, img.data, game.fadeLevel());
     ctx.putImageData(img, 0, 0);
-    if (!game.done) requestAnimationFrame(loop);
-    else { running = false; overlay.innerHTML = '&#9654; PLAY AGAIN'; overlay.style.display = 'flex'; }
+    requestAnimationFrame(frame);
   }
-  overlay.addEventListener('click', start);
-  window.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') start(); });
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>

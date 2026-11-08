@@ -7,6 +7,21 @@ Club "THE PIT" → Bosskampf gegen THE PROMOTER → K.O. → STAGE CLEAR → Kon
 
 **Fertiges Video:** [`out/mrs-anthrope-stage1.mp4`](out/mrs-anthrope-stage1.mp4) – 1920×1080, 16:9, 60 fps, ca. 93 s, mit Chiptune-Soundtrack.
 
+## Browsergame (spielbar, auch auf dem Handy)
+
+`index.html` ist das spielbare Spiel – einfach im Browser öffnen (funktioniert auch direkt per Doppelklick als Datei).
+
+- **Ablauf:** Titel → Figur wählen (VOX oder AXE, der andere kämpft als CPU-Partner mit) → Stage 1 mit drei
+  Gegnerwellen auf der Straße → Eingang des Clubs "THE PIT" → Bosskampf gegen THE PROMOTER → Konzert.
+- **Handy:** virtueller Stick links, Buttons **HIT** (Schlag, 3× = Combo), **JUMP** (Sprung, in der Luft HIT = Flugkick)
+  und **SP** (Spezialattacke, lädt sich wieder auf). Hochformat: Controller unter dem Bild, Querformat: großes Bild mit
+  halbtransparenten Buttons darüber. START = Pause.
+- **Tastatur:** Pfeiltasten/WASD, J oder Z/Y = Schlag, K/X/Leertaste = Sprung, L/C = Spezial, Enter = Start/Pause, M = Ton.
+- **Gamepad** wird ebenfalls unterstützt.
+- 3 Leben, Continue-Countdown, Pizza heilt, Zeitlimit pro Abschnitt.
+
+`demo.html` spielt die automatisch ablaufende Video-Version im Browser ab.
+
 ## Was drin ist
 
 - Echte Low-Res-Grafik: alles wird in **320×180 Pixel** mit fester Palette gezeichnet und dann
@@ -27,8 +42,7 @@ Club "THE PIT" → Bosskampf gegen THE PROMOTER → K.O. → STAGE CLEAR → Kon
 ## Ansehen / neu rendern
 
 ```bash
-# im Browser abspielen (mit Sound, läuft live):
-open index.html            # bzw. Datei im Browser öffnen, dann "PRESS START" klicken
+# Spiel im Browser:  index.html öffnen      Demo-Video live: demo.html öffnen
 
 # Video neu rendern (benötigt Node.js und ffmpeg):
 node render.js                         # -> out/mrs-anthrope-stage1.mp4 (1920x1080)
@@ -48,5 +62,6 @@ python3 tools/make_assets.py
 | `js/audio.js` | Chiptune-Synthesizer für Musik und Soundeffekte |
 | `js/assets.js` | generiert aus `assets/title_source.png` |
 | `render.js` | rendert das MP4 über ffmpeg |
-| `index.html` | Browser-Player |
-| `tools/` | Asset-Konverter und Entwickler-Hilfen (`snap.js` = Kontaktbogen einzelner Frames, `timeline.js` = Ablauf/Timing) |
+| `index.html` | spielbares Browsergame (Touch, Tastatur, Gamepad) |
+| `demo.html` | Browser-Player für die Demo-Animation |
+| `tools/` | Asset-Konverter und Entwickler-Hilfen (`snap.js` = Kontaktbogen, `timeline.js` = Ablauf der Demo, `playtest.js` = Bot spielt das Spiel durch) |

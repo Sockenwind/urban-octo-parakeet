@@ -223,6 +223,8 @@
     play1: { lean: 8, bA: [62, 98], fA: [24, 140], bL: [-25, -14], fL: [25, 10], guitar: 'play', hy: 1 },
     sing0: { lean: 8, mouth: 1, bA: [-45, -15], fA: [52, 166], bL: [-28, -16], fL: [30, 12], mic: true },
     sing1: { lean: 12, mouth: 1, hy: 1, bA: [150, 172], fA: [52, 166], bL: [-30, -18], fL: [32, 14], mic: true },
+    jump: { lean: 6, bA: [40, 150], fA: [60, 140], bL: [70, -25], fL: [95, 5] },
+    jkick: { lean: -16, bA: [-45, 5], fA: [60, 130], bL: [55, -45], fL: [96, 96] },
     drum0: { lean: 4, bA: [45, 110], fA: [55, 120], bL: [92, 0], fL: [84, 0], hipH: 15 },
     drum1: { lean: 6, hy: 1, bA: [70, 160], fA: [40, 95], bL: [92, 0], fL: [84, 0], hipH: 15 }
   };
@@ -402,6 +404,7 @@
     kick: { dur: 30, keys: [[0, 'kickW'], [7, 'kick'], [19, 'kickW'], [25, 'guard0']], act: [7, 11], reach: 32, dmg: 8, knock: 1, hitZ: 29, sfx: 'heavy', stop: 7, lunge: [5, 11, 0.9], score: 300 },
     gsmash: { dur: 58, keys: [[0, 'gsw0'], [16, 'gsw1'], [20, 'gsw2'], [30, 'gsw3'], [48, 'guard0']], act: [20, 26], reach: 48, dmg: 22, knock: 1.25, multi: true, hitZ: 31, sfx: 'smash', stop: 10, shake: 10, special: true, swing: 14, score: 500 },
     scream: { dur: 66, keys: [[0, 'screamW'], [14, 'scream'], [54, 'guard0']], proj: 16, special: true, score: 500 },
+    jkick: { reach: 32, dmg: 9, knock: 1, hitZ: 36, sfx: 'heavy', stop: 6, score: 300 },
     wave: { dmg: 16, knock: 1.15, hitZ: 36, sfx: 'heavy', stop: 6, score: 500 },
     epunch: { dur: 26, keys: [[0, 'epunchW'], [12, 'epunch'], [19, 'guard0']], act: [12, 15], reach: 24, dmg: 6, hitZ: 37, sfx: 'hit', stop: 4, swing: 10 },
     ekick: { dur: 32, keys: [[0, 'kickW'], [10, 'kick'], [22, 'kickW'], [27, 'guard0']], act: [10, 13], reach: 30, dmg: 7, hitZ: 29, sfx: 'hit', stop: 5 },
@@ -426,6 +429,7 @@
     this.scale = this.look.dims === 'boss' ? 1.35 : this.look.dims === 'big' ? 1.15 : 1;
     this.speed = o.speed || (this.team === 'player' ? 1.15 : 0.78);
     this.boss = !!o.boss;
+    this.human = !!o.human;
     this.calm = !!o.calm;
     this.ai = { cool: o.cool || 30, combo: 0, comboT: 0, spCool: o.spCool || 200, target: o.target || null, engaged: false, wait: o.wait || 0, slot: o.slot || 0, yoff: o.yoff || 0 };
     this.goal = o.goal || null;
@@ -440,7 +444,8 @@
   AP.canAct = function () { return (this.state === 'idle' || this.state === 'walk') && this.freeze <= 0; };
   AP.hittable = function () {
     return !this.removed && this.invuln <= 0 && this.state !== 'knock' && this.state !== 'down' &&
-      this.state !== 'getup' && this.state !== 'dead' && this.state !== 'leap' && this.state !== 'script';
+      this.state !== 'getup' && this.state !== 'dead' && this.state !== 'leap' && this.state !== 'script' &&
+      this.state !== 'jump' && !(this.human && this.state === 'hurt');
   };
   AP.busy = function () { return this.state === 'knock' || this.state === 'down' || this.state === 'getup' || this.state === 'dead'; };
   AP.attack = function (g, name) {
@@ -487,7 +492,7 @@
       if (A.shake && this.t === A.act[0]) g.shake = Math.max(g.shake, 4);
       if (this.t >= A.dur) {
         this.state = 'idle'; this.t = 0;
-        this.ai.cool = this.team === 'player' ? (this.atkName === 'kick' || A.special ? 22 : g.rng.int(2, 7)) : this.ai.cool;
+        this.ai.cool = this.team === 'player' ? (this.atkName === 'kick' || A.special ? 22 : g.rng.int(2, 7)) + (this.ai.partner ? 16 : 0) : this.ai.cool;
         if (this.atkName === 'kick' || A.special) this.ai.combo = 0;
         this.atk = null;
       }
@@ -514,6 +519,7 @@
       var dt = this.team === 'player' ? 40 : this.boss ? 48 : 30;
       if (this.t >= dt) {
         if (this.hp <= 0 && this.team !== 'player') { this.state = 'dead'; this.t = 0; g.onDefeat(this); }
+        else if (this.human && this.hp <= 0) { if (this.t === dt) g.onHumanDeath(this); }
         else { this.state = 'getup'; this.t = 0; }
       }
     } else if (st === 'getup') {
@@ -522,6 +528,11 @@
     } else if (st === 'dead') {
       this.pose = POSES.lie;
       if (this.t >= 40) this.removed = true;
+    } else if (st === 'jump') {
+      this.x += this.vx; this.z += this.vz; this.vz -= 0.19;
+      this.pose = this.jkick ? POSES.jkick : POSES.jump;
+      if (this.jkick) g.resolveHits(this, ATK.jkick);
+      if (this.z <= 0 && this.t > 2) { this.z = 0; this.state = 'idle'; this.t = 0; this.jkick = false; g.sfx('land'); }
     } else if (st === 'leap') {
       // scripted jump from (sx,sy) to (tx,ty) over dur frames
       var L = this.leap, u = Math.min(1, this.t / L.dur);
@@ -539,7 +550,11 @@
   };
 
   // ================================================================ GAME
-  function Game() {
+  function Game(opts) {
+    opts = opts || {};
+    this.mode = opts.mode || 'demo';
+    this.input = {}; this.prevIn = {}; this.pressed = {};
+    this.items = [];
     this.frame = 0;
     this.rng = new MA.RNG(20261108);
     this.actors = []; this.fx = []; this.events = [];
@@ -552,7 +567,7 @@
     this.players = [];
     this.musicStart = 0; this.musicName = null;
     nextId = 1;
-    this.script = director(this);
+    this.script = this.mode === 'play' ? playDirector(this) : director(this);
   }
   MA.Game = Game;
   var GP = Game.prototype;
@@ -589,10 +604,11 @@
   GP.hit = function (a, e, A) {
     e.hp -= A.dmg;
     e.dir = -a.dir;
-    if (e.team === 'player') e.hp = Math.max(e.hp, 14);
+    if (e.team === 'player' && !e.human) e.hp = Math.max(e.hp, 14);
+    if (e.human && e.hp <= 0) e.hp = 0;
     e.hits++;
     var heavy = A.knock;
-    var knock = A.knock || e.hp <= 0 || (e.team === 'enemy' && !e.boss && e.hits >= 4) || (e.boss && e.hits >= 7);
+    var knock = A.knock || (e.hp <= 0) || (e.team === 'enemy' && !e.boss && e.hits >= 4) || (e.boss && e.hits >= 7);
     a.freeze = A.stop; e.freeze = A.stop; e.flash = 5;
     var sx = e.x - a.dir * 4 * e.scale;
     this.fx.push({ type: 'spark', x: sx, y: e.y + 1, z: A.hitZ * e.scale, t: 0, life: 12, big: !!heavy || A.special });
@@ -613,6 +629,7 @@
     var last = null, self = this;
     this.players.forEach(function (p) { if (self.hudTarget[p.id] && self.hudTarget[p.id].actor === e) last = p; });
     (last || this.players[0]).score += e.boss ? 10000 : 500;
+    if (this.mode === 'play' && e.drop) this.items.push({ x: e.x, y: e.y, kind: e.drop, t: 0 });
   };
 
   GP.updateFx = function () {
@@ -642,7 +659,14 @@
     if (p.goal) { this.moveTo(p, p.goal.x, p.goal.y); if (p.goal && p.goal.face) p.dir = p.goal.face; return; }
     if (this.peace) return;
     var es = this.actors.filter(function (e) { return e.team === 'enemy' && !e.removed && e.state !== 'dead' && e.state !== 'leap' && e.state !== 'script'; });
-    if (!es.length) return;
+    if (!es.length) {
+      var hu = this.human;
+      if (hu && p !== hu) {
+        var fdx = hu.x - 30 - p.x, fdy = (p.ai.lane || p.y) - p.y;
+        if (Math.abs(fdx) > 10 || Math.abs(fdy) > 3) { p.mx = clamp(fdx * 0.2, -1, 1); p.my = clamp(fdy * 0.3, -1, 1); p.dir = sgn(fdx); }
+      }
+      return;
+    }
     var best = null, bd = 1e9, self = this;
     es.forEach(function (e) {
       var d = Math.abs(e.x - p.x) + Math.abs(e.y - p.y) * 2;
@@ -676,7 +700,7 @@
     var wantSp = p.ai.spCool <= 0 && (front >= 2 || this.forceSpecial || this.rng.next() < (t.boss ? 0.3 : 0.12));
     if (wantSp) {
       p.attack(this, p.kind === 'vox' ? 'scream' : 'gsmash');
-      p.ai.spCool = this.forceSpecial ? 90 : 260;
+      p.ai.spCool = this.forceSpecial ? 90 : (p.ai.partner ? 480 : 260);
       return;
     }
     var seq = ['jab', 'cross', 'kick'];
@@ -747,17 +771,22 @@
   // ---------------------------------------------------------------- step
   GP.step = function () {
     if (this.done) return;
+    var I = this.input, PI = this.prevIn, pr = {};
+    ['attack', 'jump', 'special', 'start', 'tap', 'left', 'right', 'up', 'down'].forEach(function (k) { pr[k] = !!I[k] && !PI[k]; PI[k] = !!I[k]; });
+    this.pressed = pr;
+    if (this.mode === 'play' && this.playOverlay()) { this.frame++; return; }
     var r = this.script.next();
     if (r.done) this.done = true;
     var slow = this.slowmo > 0 && (this.slowmo-- % 4 !== 0);
     if (!slow) {
       var self = this;
       this.actors.forEach(function (a) {
-        if (a.team === 'player') self.playerAI(a); else self.enemyAI(a);
+        if (a.human) self.humanControl(a); else if (a.team === 'player') self.playerAI(a); else self.enemyAI(a);
       });
       this.actors.forEach(function (a) { a.update(self); });
       this.separate();
       this.updateFx();
+      this.updateItems();
       if (this.floor) this.actors.forEach(function (a) {
         if (a.state !== 'leap' && a.state !== 'script' && !a.noClamp) a.y = clamp(a.y, self.floor[0], self.floor[1]);
         if (self.lockCam && a.x > self.cam + 10 && a.x < self.cam + W - 10) a.entered = true;
@@ -766,7 +795,12 @@
       this.actors = this.actors.filter(function (a) { return !a.removed; });
       for (var id in this.hudTarget) if (--this.hudTarget[id].t <= 0) delete this.hudTarget[id];
       if (this.shake > 0) this.shake--;
-      if (this.hud && this.timerRun) { if (++this.timeT >= 72) { this.timeT = 0; this.time = Math.max(0, this.time - 1); } }
+      if (this.hud && this.timerRun) {
+        if (++this.timeT >= (this.mode === 'play' ? 60 : 72)) {
+          this.timeT = 0; this.time = Math.max(0, this.time - 1);
+          if (this.mode === 'play' && this.time === 0) this.timeOver();
+        }
+      }
     }
     if (this.showTags > 0) this.showTags--;
     if (this.koFlash > 0) this.koFlash--;
@@ -980,6 +1014,356 @@
     this.banner('K.O.', 150, { scale: 6, col: 'R', y: 52, outline: 'W', band: true });
     boss.hp = 0;
   };
+
+  // ================================================================ PLAY MODE
+  GP.humanControl = function (p) {
+    var I = this.input, pr = this.pressed;
+    if (p.ai.spCool > 0) p.ai.spCool--;
+    p.ai.comboT++;
+    if (p.goal) {
+      if (p.canAct()) { p.mx = p.my = 0; this.moveTo(p, p.goal.x, p.goal.y); if (p.goal && p.goal.face) p.dir = p.goal.face; }
+      return;
+    }
+    if (this.lockInput) { if (p.canAct()) { p.mx = p.my = 0; } return; }
+    if (p.state === 'jump') {
+      if (pr.attack && !p.jkick && p.z > 1) { p.jkick = true; p.hitSet = []; this.sfx('swing'); }
+      return;
+    }
+    if (p.state === 'attack') {
+      if (pr.attack && p.atk && !p.atk.special) p.queued = true;
+      return;
+    }
+    if (!p.canAct()) { p.mx = p.my = 0; p.queued = false; return; }
+    var mx = (I.right ? 1 : 0) - (I.left ? 1 : 0), my = (I.down ? 1 : 0) - (I.up ? 1 : 0);
+    p.mx = mx; p.my = my;
+    if (mx) p.dir = mx;
+    if (pr.special && p.ai.spCool <= 0) {
+      p.mx = p.my = 0; p.ai.combo = 0;
+      p.attack(this, p.kind === 'vox' ? 'scream' : 'gsmash');
+      p.ai.spCool = 240;
+      return;
+    }
+    if (pr.jump) {
+      p.state = 'jump'; p.t = 0; p.vz = 3.3; p.vx = mx * 1.5; p.jkick = false; p.hitSet = []; p.mx = p.my = 0;
+      this.sfx('swing');
+      return;
+    }
+    if (pr.attack || p.queued) {
+      p.queued = false;
+      if (p.ai.comboT > 40) p.ai.combo = 0;
+      var seq = p.kind === 'axe' ? ['jab', 'jab', 'kick'] : ['jab', 'cross', 'kick'];
+      p.mx = p.my = 0;
+      p.attack(this, seq[p.ai.combo % 3]);
+      p.ai.combo = (p.ai.combo + 1) % 3; p.ai.comboT = 0;
+    }
+  };
+
+  GP.onHumanDeath = function (p) {
+    if (p.lives > 1) {
+      p.lives--; p.hp = p.maxHp; p.state = 'idle'; p.t = 0; p.rot = 0; p.invuln = 150;
+      this.sfx('select');
+    } else {
+      p.lives = 0; this.contT = 600; this.sfx('card');
+    }
+  };
+  GP.revive = function () {
+    var p = this.human;
+    p.lives = 3; p.hp = p.maxHp; p.state = 'idle'; p.t = 0; p.rot = 0; p.z = 0; p.invuln = 150;
+    this.contT = 0; this.sfx('select');
+  };
+  GP.timeOver = function () {
+    var h = this.human;
+    this.time = 99;
+    if (!h || h.busy() || h.state === 'script') return;
+    this.banner('TIME OVER', 100, { scale: 3, col: 'R', y: 62, band: true });
+    h.hp = 0; h.knock(this, -h.dir, 0.8);
+  };
+  // returns true when the world is frozen (pause / continue / game over)
+  GP.playOverlay = function () {
+    var pr = this.pressed;
+    if (this.contT > 0) {
+      this.contT--;
+      if (pr.start || pr.attack || pr.tap) this.revive();
+      else if (this.contT === 0) { this.overT = 220; this.music(null); this.sfx('ko'); }
+      return true;
+    }
+    if (this.overT > 0) { if (--this.overT === 0) this.restart = true; return true; }
+    if (this.restart) return true;
+    if (this.canPause && pr.start) { this.paused = !this.paused; this.sfx('tick'); }
+    return !!this.paused;
+  };
+  GP.updateItems = function () {
+    var h = this.human, self = this;
+    if (!h || !this.items.length) return;
+    this.items = this.items.filter(function (it) {
+      it.t++;
+      if (h.canAct() && h.z === 0 && Math.abs(h.x - it.x) < 13 && Math.abs(h.y - it.y) < 8) {
+        h.hp = Math.min(h.maxHp, h.hp + 45); h.score += 1000;
+        self.sfx('pickup'); self.popup(it.x, it.y, 24, 'YUM!');
+        return false;
+      }
+      return true;
+    });
+  };
+
+  function* untilClearP(g) { while (g.enemies().length) yield; }
+  function* scrollTo(g, target) {
+    yield* wait(30);
+    g.showGo = true; g.sfx('go');
+    var h = g.human;
+    while (g.cam < target) {
+      g.cam = Math.min(target, Math.max(g.cam, h.x - 150));
+      if (g.frame % 60 === 0) g.sfx('go');
+      yield;
+    }
+    g.cam = target; g.showGo = false;
+    g.time = 99;
+  }
+  function anyPress(g) { var p = g.pressed; return p.start || p.attack || p.tap || p.jump || p.special; }
+
+  function* playDirector(g) {
+    var i;
+    // ------------------------------------------------ TITLE
+    g.scene = 'title'; g.sceneT = 0;
+    g.music('title');
+    yield* fadeIn(g, 16);
+    for (i = 0; ; i++) { g.sceneT = i; if (i > 10 && anyPress(g)) break; yield; }
+    g.titleSel = true; g.music(null); g.sfx('select');
+    for (i = 0; i < 45; i++) { g.sceneT++; yield; }
+    yield* fadeOut(g, 20);
+    // ------------------------------------------------ CHARACTER SELECT
+    g.scene = 'select'; g.selIdx = 0; g.selDone = false; g.sceneT = 0;
+    g.music('boss');
+    yield* fadeIn(g, 12);
+    for (i = 0; ; i++) {
+      g.sceneT = i;
+      var pr = g.pressed;
+      if (pr.left && g.selIdx !== 0) { g.selIdx = 0; g.sfx('tick'); }
+      if (pr.right && g.selIdx !== 1) { g.selIdx = 1; g.sfx('tick'); }
+      if (pr.tap && g.tapX !== undefined) {
+        var k = g.tapX < W / 2 ? 0 : 1;
+        if (k === g.selIdx && i > 10) break;
+        g.selIdx = k; g.sfx('tick');
+      } else if (i > 10 && (pr.attack || pr.start)) break;
+      yield;
+    }
+    g.sfx('select'); g.selDone = true; g.music(null);
+    for (i = 0; i < 45; i++) { g.sceneT++; yield; }
+    yield* fadeOut(g, 20);
+    var kind = g.selIdx === 0 ? 'vox' : 'axe', other = kind === 'vox' ? 'axe' : 'vox';
+    // ------------------------------------------------ STAGE CARD
+    g.scene = 'card'; g.sceneT = 0;
+    g.sfx('card');
+    for (i = 0; i < 150; i++) {
+      g.sceneT = i;
+      g.fade = i < 16 ? 4 - Math.floor(i / 4) : i >= 126 ? Math.min(4, 1 + Math.floor((i - 126) / 6)) : 0;
+      yield;
+    }
+    // ------------------------------------------------ STREET
+    g.scene = 'street'; g.sceneT = 0; g.cam = 0; g.hud = true; g.floor = [124, 172]; g.lockCam = false;
+    g.music('stage');
+    var h = g.spawn(kind, { x: -20, y: 142, team: 'player', hp: 100, human: true });
+    var c = g.spawn(other, { x: -46, y: 162, team: 'player', hp: 100 });
+    g.human = h; h.lives = 3; h.speed = 1.25;
+    h.ai.lane = 140; c.ai.lane = 160; c.ai.partner = true;
+    c.ai.bossSide = 1;
+    g.lockInput = true;
+    h.goal = { x: 92, y: 140 }; c.goal = { x: 62, y: 162 };
+    g.showTags = 200;
+    yield* fadeIn(g, 20);
+    for (i = 0; i < 90 && (h.goal || c.goal); i++) yield;
+    h.goal = null; c.goal = null;
+    g.lockInput = false; g.lockCam = true; g.canPause = true; g.timerRun = true; g.time = 99;
+    g.banner('GO!', 80, { scale: 4, col: 'Y', y: 62 });
+    g.sfx('go');
+    yield* wait(50);
+    // wave 1
+    g.spawn('punk', { x: g.cam + 345, y: 136, target: h, cool: 60 });
+    g.spawn('punk2', { x: g.cam + 360, y: 162, target: c, cool: 80, slot: 1, yoff: 8 });
+    yield* wait(160);
+    g.spawn('punk3', { x: g.cam - 26, y: 150, target: h, cool: 70, yoff: -6 });
+    yield* untilClearP(g);
+    yield* scrollTo(g, 380);
+    // wave 2
+    g.spawn('suit', { x: g.cam + 350, y: 140, target: h, cool: 60 });
+    g.spawn('punk', { x: g.cam + 340, y: 166, target: c, cool: 80, slot: 1, yoff: 10 });
+    g.spawn('punk2', { x: g.cam - 24, y: 134, target: h, cool: 90, slot: 1, yoff: -10 });
+    yield* wait(170);
+    g.spawn('bouncer', { x: g.cam + 350, y: 152, target: h, cool: 70, slot: 2, hp: 36, speed: 0.7 }).drop = 'pizza';
+    yield* untilClearP(g);
+    yield* scrollTo(g, 680);
+    // wave 3
+    g.spawn('punk3', { x: g.cam + 345, y: 132, target: h, cool: 50 });
+    g.spawn('suit', { x: g.cam - 26, y: 160, target: c, cool: 70, slot: 1 });
+    g.spawn('punk2', { x: g.cam + 360, y: 156, target: h, cool: 90, slot: 2, yoff: 12 });
+    yield* wait(150);
+    g.spawn('bouncer', { x: g.cam - 30, y: 140, target: h, cool: 80, slot: 2, hp: 36, speed: 0.7 }).drop = 'pizza';
+    g.spawn('punk', { x: g.cam + 350, y: 146, target: c, cool: 100, slot: 3, yoff: -12 });
+    yield* untilClearP(g);
+    yield* scrollTo(g, 940);
+    // the club door
+    var doorX = 1072;
+    g.doorHint = true;
+    while (!(Math.abs(h.x - doorX) < 26 && h.y < 138 && h.canAct())) yield;
+    g.doorHint = false; g.lockInput = true; g.timerRun = false; g.canPause = false;
+    h.calm = true; c.calm = true;
+    h.goal = { x: doorX + 8, y: 125 }; c.goal = { x: doorX - 14, y: 127 };
+    for (i = 0; i < 160 && (h.goal || c.goal); i++) yield;
+    h.dir = -1; c.dir = 1;
+    g.sfx('door'); g.doorOpen = true;
+    yield* wait(24);
+    g.floor = [116, 172]; g.lockCam = false;
+    h.goal = { x: doorX, y: 121 }; c.goal = { x: doorX - 4, y: 121 };
+    yield* wait(14);
+    yield* fadeOut(g, 28);
+    g.music(null);
+    yield* wait(16);
+    // ------------------------------------------------ VENUE / BOSS
+    g.scene = 'venue'; g.sceneT = 0; g.cam = 0; g.floor = [128, 172]; g.doorOpen = false;
+    g.actors = g.actors.filter(function (a) { return a.team === 'player'; });
+    g.items = [];
+    h.calm = false; c.calm = false; h.x = -20; h.y = 144; c.x = -44; c.y = 162; h.dir = c.dir = 1;
+    h.goal = { x: 84, y: 142 }; c.goal = { x: 62, y: 162 };
+    if (h.hp < 70) g.items.push({ x: 34, y: 152, kind: 'pizza', t: 0 });
+    var boss = g.spawn('boss', { x: 230, y: 112, hp: 140, boss: true, cool: 50, speed: 0.62, target: h });
+    boss.state = 'script'; boss.anim = function (gg) { return (Math.floor(gg.frame / 30) % 2) ? 'taunt' : 'stand'; };
+    boss.dir = -1; boss.noClamp = true;
+    g.music('boss');
+    yield* fadeIn(g, 20);
+    for (i = 0; i < 70; i++) yield;
+    g.bossCard = 0; g.sfx('card');
+    for (i = 0; i < 120; i++) { g.bossCard = i; if (i > 30 && i < 100 && anyPress(g)) i = 100; yield; }
+    g.bossCard = -1;
+    boss.anim = null; boss.state = 'leap'; boss.t = 0;
+    boss.leap = { sx: 230, sy: 112, sz: 0, tx: 206, ty: 150, h: 26, dur: 42, done: function () { boss.noClamp = false; } };
+    g.sfx('swing');
+    for (i = 0; i < 56; i++) yield;
+    h.goal = null; c.goal = null;
+    g.banner('FIGHT!', 70, { scale: 4, col: 'R', y: 64 });
+    g.sfx('go');
+    g.bossBar = true; g.lockCam = true; g.lockInput = false; g.canPause = true; g.timerRun = true; g.time = 99;
+    while (!g.koDone) {
+      if (boss.hp <= 50) g.forceSpecial = true;
+      yield;
+    }
+    while (g.slowmo > 0) yield;
+    g.forceSpecial = false; g.peace = true; g.lockInput = true; g.timerRun = false; g.canPause = false;
+    while (boss.state !== 'dead' && boss.state !== 'down') yield;
+    yield* wait(20);
+    h.goal = { x: 136, y: 146, face: 1 }; c.goal = { x: 180, y: 150, face: -1 };
+    for (i = 0; i < 150 && (h.goal || c.goal); i++) yield;
+    h.dir = 1; c.dir = -1;
+    g.music('clear');
+    g.players.forEach(function (p) {
+      p.state = 'script'; p.t = 0;
+      p.anim = function (gg, a) { return (Math.floor((gg.frame + a.phase) / 14) % 2) ? 'victory' : 'victory2'; };
+    });
+    g.banner('STAGE CLEAR!', 250, { scale: 3, col: 'Y', y: 56, outline: 'r', band: true });
+    g.tally = 0;
+    for (i = 0; i < 250; i++) {
+      if (i > 70) g.tally = Math.min(g.time * 100, (i - 70) * 60);
+      if (i > 70 && i % 4 === 0 && g.tally < g.time * 100) g.sfx('tick');
+      yield;
+    }
+    h.score += g.time * 100;
+    yield* fadeOut(g, 28);
+    g.tally = null;
+    // ------------------------------------------------ CONCERT + END
+    g.scene = 'concert'; g.sceneT = 0; g.hud = false; g.bossBar = false; g.floor = null; g.lockCam = false;
+    g.actors = [];
+    var cb = g.spawn('axe', { x: 66, y: 142, team: 'band', dir: 1 });
+    var cv = g.spawn('vox', { x: 152, y: 144, team: 'band', dir: 1 });
+    var cd = g.spawn('drum', { x: 212, y: 124, team: 'band', dir: -1 });
+    var cr = g.spawn('cap', { x: 270, y: 142, team: 'band', dir: -1 });
+    var beat = 3600 / 168;
+    [cb, cv, cd, cr].forEach(function (a, k) {
+      a.state = 'script';
+      a.anim = function (gg) {
+        var b = Math.floor((gg.frame - gg.musicStart) / (beat / 2));
+        if (a === cv) return (Math.floor(b / 2) % 2) ? 'sing1' : 'sing0';
+        if (a === cd) return (b % 2) ? 'drum1' : 'drum0';
+        return ((b + k) % 2) ? 'play1' : 'play0';
+      };
+    });
+    g.music('concert');
+    yield* fadeIn(g, 24);
+    for (i = 0; i < 240; i++) { g.sceneT = i + 24; yield; }
+    g.endScreen = true;
+    for (i = 0; ; i++) { g.sceneT++; if (i > 60 && anyPress(g)) break; yield; }
+    g.sfx('select');
+    yield* fadeOut(g, 30);
+    g.music(null);
+    g.restart = true;
+    for (;;) yield;
+  }
+
+  function bigSprite(buf, s, x, y, k) {
+    var i, j, c;
+    for (j = 0; j < s.h; j++) for (i = 0; i < s.w; i++) if (s.px[j * s.w + i] !== MA.TR) buf.rect(x + i * k - 2, y + j * k - 2, k + 4, k + 4, K);
+    for (j = 0; j < s.h; j++) for (i = 0; i < s.w; i++) { c = s.px[j * s.w + i]; if (c !== MA.TR) buf.rect(x + i * k, y + j * k, k, k, c); }
+  }
+  function drawSelect(buf, g) {
+    buf.clear(K);
+    var t = g.sceneT;
+    for (var y = 0; y < H; y += 2) buf.rect(0, y, W, 1, ((y >> 1) + (t >> 2)) % 6 === 0 ? C.q : K);
+    buf.title(22, 0, 196, 68, 62, -6, true);
+    buf.textC('SELECT YOUR ROCKER', W / 2, 62, C.W, { scale: 1, outline: C.r });
+    var chars = [
+      { head: 'vox', name: 'VOX', role: 'VOCALS', sp: 'SCREAM WAVE' },
+      { head: 'axe', name: 'AXE', role: 'GUITAR', sp: 'GUITAR SMASH' }
+    ];
+    chars.forEach(function (ch, k) {
+      var px = k ? 170 : 54, py = 76, pw = 96, ph = 82;
+      var sel = g.selIdx === k;
+      var blink = g.selDone ? (t >> 2) % 2 : (t >> 4) % 2;
+      buf.rect(px - 2, py - 2, pw + 4, ph + 4, sel ? (blink ? C.Y : C.R) : C.E);
+      buf.rect(px, py, pw, ph, sel ? C.q : C.Q);
+      if (sel) buf.drect(px, py, pw, ph, C.r, 3);
+      var hs = HS[ch.head];
+      bigSprite(buf, hs, px + Math.round((pw - hs.w * 3) / 2), py + 4, 3);
+      buf.textC(ch.name, px + pw / 2, py + 48, sel ? C.Y : C.W, { scale: 2, outline: K });
+      buf.textC(ch.role, px + pw / 2, py + 63, C.L);
+      buf.textC(ch.sp, px + pw / 2, py + 72, sel ? C.N : C.G);
+    });
+    var other = g.selIdx === 0 ? 'AXE' : 'VOX';
+    buf.textC('PARTNER: ' + other + ' (CPU)', W / 2, 162, C.L);
+    if ((t >> 4) % 2 === 0 && !g.selDone) buf.textC('< >  CHOOSE     HIT = OK', W / 2, 172, C.W);
+  }
+  function drawPizza(buf, x, y, t) {
+    buf.ellipse(x, y, 8, 3, K);
+    buf.ellipse(x, y - 1, 7, 2.6, C.O);
+    buf.ellipse(x, y - 1, 5.5, 1.8, C.Y);
+    buf.pset(x - 3, y - 1, C.R); buf.pset(x + 2, y - 2, C.R); buf.pset(x + 1, y, C.R); buf.pset(x - 1, y - 2, C.n);
+    if ((t >> 3) % 2) buf.pset(x + 4, y - 4, C.w);
+  }
+  function drawPlayOverlay(buf, g) {
+    if (g.doorHint && (g.frame >> 4) % 2 === 0) {
+      var dx = 1072 - Math.round(g.cam);
+      buf.textC('ENTER', dx, 90, C.Y, { outline: K });
+      buf.poly([dx - 5, 99, dx + 5, 99, dx, 105], K); buf.poly([dx - 3, 100, dx + 3, 100, dx, 104], C.Y);
+    }
+    if (g.paused) {
+      buf.rect(0, 74, W, 30, K);
+      if ((g.frame >> 4) % 2 === 0) buf.textC('PAUSE', W / 2, 78, C.Y, { scale: 3, outline: C.r, bold: true });
+      buf.textC('START = WEITER', W / 2, 100 - 4, C.L);
+    }
+    if (g.contT > 0) {
+      buf.rect(0, 58, W, 62, K); buf.rect(0, 59, W, 1, C.r); buf.rect(0, 118, W, 1, C.r);
+      buf.textC('CONTINUE?', W / 2, 64, C.W, { scale: 3, outline: C.r, bold: true });
+      buf.textC(String(Math.ceil(g.contT / 60) - 1 < 0 ? 0 : Math.ceil(g.contT / 60) - 1), W / 2, 88, C.Y, { scale: 3, outline: K, bold: true });
+      if ((g.frame >> 4) % 2 === 0) buf.textC('PRESS START', W / 2, 110, C.W);
+    }
+    if (g.overT > 0) {
+      buf.rect(0, 66, W, 44, K);
+      buf.textC('GAME OVER', W / 2, 76, C.R, { scale: 4, outline: C.W, bold: true });
+    }
+    if (g.endScreen) {
+      buf.rect(0, 70, W, 46, K); buf.rect(0, 71, W, 1, C.r); buf.rect(0, 114, W, 1, C.r);
+      buf.textC('THANK YOU FOR PLAYING!', W / 2, 76, C.Y, { scale: 2, outline: C.r });
+      buf.textC('SCORE ' + pad(g.human ? g.human.score : 0, 7), W / 2, 94, C.W);
+      if ((g.frame >> 4) % 2 === 0) buf.textC('PRESS START', W / 2, 104, C.N);
+    }
+  }
 
   // ================================================================ BACKGROUNDS
   var hash = MA.hash;
@@ -1450,12 +1834,18 @@
     ps.forEach(function (p, i) {
       var left = i === 0;
       var x = left ? 6 : W - 6 - 96;
-      buf.text(left ? '1P' : '2P', x, 3, left ? C.N : C.R, o);
-      buf.text(p.name, x + 15, 3, C.W, o);
+      var lab = left ? '1P' : (g.mode === 'play' ? 'CPU' : '2P');
+      buf.text(lab, x, 3, left ? C.N : C.R, o);
+      buf.text(p.name, x + MA.textWidth(lab) + 4, 3, C.W, o);
       buf.text(pad(p.score, 7), x + 54, 3, C.W, o);
       var fr = p.hp / p.maxHp;
       bar(buf, x, 13, 80, fr, fr > 0.5 ? C.Y : fr > 0.25 ? C.O : C.R, C.q);
-      buf.text('x' + p.lives, x + 84, 12, C.W, o);
+      if (!(g.mode === 'play' && !left)) buf.text('x' + p.lives, x + 84, 12, C.W, o);
+      if (p.human) {
+        var sp = 1 - p.ai.spCool / 240;
+        buf.rect(x - 1, 19, 82, 3, K);
+        buf.rect(x, 20, Math.round(80 * sp), 1, sp >= 1 ? ((g.frame >> 3) % 2 ? C.N : C.w) : C.n);
+      }
       var ht = g.hudTarget[p.id];
       if (ht && !ht.actor.boss && ht.t % 1 === 0) {
         buf.text(ht.actor.name, x, 22, C.L, o);
@@ -1523,6 +1913,7 @@
     buf.remap = null; buf.ox = 0; buf.oy = 0;
     if (g.scene === 'title') { drawTitle(buf, g); return; }
     if (g.scene === 'card') { drawCard(buf, g); return; }
+    if (g.scene === 'select') { drawSelect(buf, g); return; }
     if (g.scene === 'black') { buf.clear(K); return; }
     var shx = g.shake > 0 ? ((g.shake >> 1) % 2 ? 2 : -2) : 0;
     var shy = g.shake > 0 ? ((g.shake >> 2) % 2 ? 1 : -1) : 0;
@@ -1531,6 +1922,7 @@
     else if (g.scene === 'venue') drawVenue(buf, g);
     else if (g.scene === 'concert') drawConcert(buf, g, 'back');
     // actors sorted by depth
+    g.items.forEach(function (it) { drawPizza(buf, Math.round(it.x - g.cam), Math.round(it.y), it.t); });
     var list = g.actors.slice().sort(function (a, b) { return a.y - b.y || a.id - b.id; });
     // shadows
     list.forEach(function (a) {
@@ -1553,7 +1945,8 @@
     buf.ox = 0; buf.oy = 0;
     if (g.hud) drawHUD(buf, g);
     drawBanners(buf, g);
-    if (g.scene === 'concert') {
+    if (g.mode === 'play') drawPlayOverlay(buf, g);
+    if (g.scene === 'concert' && g.mode !== 'play') {
       if (g.sceneT > 330 && (g.frame >> 4) % 4 !== 3) buf.textC('TO BE CONTINUED...', W / 2, 92, C.W, { scale: 1, outline: K });
     }
   };
