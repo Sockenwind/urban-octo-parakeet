@@ -17,7 +17,8 @@ Club "THE PIT" → Bosskampf gegen THE PROMOTER → K.O. → STAGE CLEAR → Kon
   und **SP** (Spezialattacke, lädt sich wieder auf). Hochformat: Controller unter dem Bild, Querformat: großes Bild mit
   halbtransparenten Buttons darüber. START = Pause.
 - **Tastatur:** Pfeiltasten/WASD, J oder Z/Y = Schlag, K/X/Leertaste = Sprung, L/C = Spezial, Enter = Start/Pause, M = Ton.
-- **Gamepad** wird ebenfalls unterstützt.
+- **Gamepad** wird ebenfalls unterstützt. **2 Spieler:** ein zweiter Controller drückt während des Spiels START
+  und übernimmt die CPU-Figur (Drop-in-Koop wie am Arcade-Automaten).
 - 3 Leben, Continue-Countdown, Pizza heilt, Zeitlimit pro Abschnitt.
 
 `demo.html` spielt die automatisch ablaufende Video-Version im Browser ab.

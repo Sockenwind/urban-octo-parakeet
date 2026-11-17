@@ -554,6 +554,7 @@
     opts = opts || {};
     this.mode = opts.mode || 'demo';
     this.input = {}; this.prevIn = {}; this.pressed = {};
+    this.input2 = {}; this.prevIn2 = {}; this.pressed2 = {};
     this.items = [];
     this.frame = 0;
     this.rng = new MA.RNG(20261108);
@@ -771,10 +772,15 @@
   // ---------------------------------------------------------------- step
   GP.step = function () {
     if (this.done) return;
-    var I = this.input, PI = this.prevIn, pr = {};
-    ['attack', 'jump', 'special', 'start', 'tap', 'left', 'right', 'up', 'down'].forEach(function (k) { pr[k] = !!I[k] && !PI[k]; PI[k] = !!I[k]; });
-    this.pressed = pr;
+    function edges(I, PI) {
+      var pr = {};
+      ['attack', 'jump', 'special', 'start', 'tap', 'left', 'right', 'up', 'down'].forEach(function (k) { pr[k] = !!I[k] && !PI[k]; PI[k] = !!I[k]; });
+      return pr;
+    }
+    this.pressed = edges(this.input, this.prevIn);
+    this.pressed2 = edges(this.input2, this.prevIn2);
     if (this.mode === 'play' && this.playOverlay()) { this.frame++; return; }
+    if (this.mode === 'play' && this.canPause && this.pressed2.start) this.join2();
     var r = this.script.next();
     if (r.done) this.done = true;
     var slow = this.slowmo > 0 && (this.slowmo-- % 4 !== 0);
@@ -1017,7 +1023,7 @@
 
   // ================================================================ PLAY MODE
   GP.humanControl = function (p) {
-    var I = this.input, pr = this.pressed;
+    var I = p.pad === 2 ? this.input2 : this.input, pr = p.pad === 2 ? this.pressed2 : this.pressed;
     if (p.ai.spCool > 0) p.ai.spCool--;
     p.ai.comboT++;
     if (p.goal) {
@@ -1058,7 +1064,24 @@
     }
   };
 
+  GP.join2 = function () {
+    var self = this, p = this.players.filter(function (a) { return a !== self.human; })[0];
+    if (!p || p.human || p.state === 'script' || p.busy()) return;
+    p.human = true; p.pad = 2; p.lives = 3; p.hp = p.maxHp; p.speed = 1.25; p.invuln = 60;
+    p.ai.partner = false; p.ai.spCool = 0; p.ai.combo = 0; p.goal = null;
+    this.banner('2P JOINED!', 80, { scale: 2, col: 'R', y: 46 });
+    this.sfx('select');
+  };
   GP.onHumanDeath = function (p) {
+    if (p !== this.human) { // player 2: respawn or hand the character back to the CPU
+      if (p.lives > 1) { p.lives--; this.sfx('select'); }
+      else {
+        p.human = false; p.pad = 0; p.ai.partner = true; p.speed = 1.15; p.lives = 0;
+        this.banner('2P GAME OVER', 90, { scale: 2, col: 'R', y: 46 });
+      }
+      p.hp = p.maxHp; p.state = 'idle'; p.t = 0; p.rot = 0; p.invuln = 150;
+      return;
+    }
     if (p.lives > 1) {
       p.lives--; p.hp = p.maxHp; p.state = 'idle'; p.t = 0; p.rot = 0; p.invuln = 150;
       this.sfx('select');
@@ -1089,18 +1112,22 @@
     }
     if (this.overT > 0) { if (--this.overT === 0) this.restart = true; return true; }
     if (this.restart) return true;
-    if (this.canPause && pr.start) { this.paused = !this.paused; this.sfx('tick'); }
+    var p2 = this.players.some(function (a) { return a.human && a.pad === 2; });
+    if (this.canPause && (pr.start || (p2 && this.pressed2.start))) { this.paused = !this.paused; this.sfx('tick'); }
     return !!this.paused;
   };
   GP.updateItems = function () {
-    var h = this.human, self = this;
-    if (!h || !this.items.length) return;
+    var self = this, hs = this.players.filter(function (a) { return a.human; });
+    if (!hs.length || !this.items.length) return;
     this.items = this.items.filter(function (it) {
       it.t++;
-      if (h.canAct() && h.z === 0 && Math.abs(h.x - it.x) < 13 && Math.abs(h.y - it.y) < 8) {
-        h.hp = Math.min(h.maxHp, h.hp + 45); h.score += 1000;
-        self.sfx('pickup'); self.popup(it.x, it.y, 24, 'YUM!');
-        return false;
+      for (var i = 0; i < hs.length; i++) {
+        var h = hs[i];
+        if (h.canAct() && h.z === 0 && Math.abs(h.x - it.x) < 13 && Math.abs(h.y - it.y) < 8) {
+          h.hp = Math.min(h.maxHp, h.hp + 45); h.score += 1000;
+          self.sfx('pickup'); self.popup(it.x, it.y, 24, 'YUM!');
+          return false;
+        }
       }
       return true;
     });
@@ -1110,9 +1137,9 @@
   function* scrollTo(g, target) {
     yield* wait(30);
     g.showGo = true; g.sfx('go');
-    var h = g.human;
     while (g.cam < target) {
-      g.cam = Math.min(target, Math.max(g.cam, h.x - 150));
+      var lead = Math.max.apply(null, g.players.filter(function (a) { return a.human; }).map(function (a) { return a.x; }));
+      g.cam = Math.min(target, Math.max(g.cam, lead - 150));
       if (g.frame % 60 === 0) g.sfx('go');
       yield;
     }
@@ -1204,7 +1231,7 @@
     // the club door
     var doorX = 1072;
     g.doorHint = true;
-    while (!(Math.abs(h.x - doorX) < 26 && h.y < 138 && h.canAct())) yield;
+    while (!g.players.some(function (a) { return a.human && Math.abs(a.x - doorX) < 26 && a.y < 138 && a.canAct(); })) yield;
     g.doorHint = false; g.lockInput = true; g.timerRun = false; g.canPause = false;
     h.calm = true; c.calm = true;
     h.goal = { x: doorX + 8, y: 125 }; c.goal = { x: doorX - 14, y: 127 };
@@ -1834,19 +1861,20 @@
     ps.forEach(function (p, i) {
       var left = i === 0;
       var x = left ? 6 : W - 6 - 96;
-      var lab = left ? '1P' : (g.mode === 'play' ? 'CPU' : '2P');
+      var lab = left ? '1P' : (g.mode === 'play' && !p.human ? 'CPU' : '2P');
       buf.text(lab, x, 3, left ? C.N : C.R, o);
       buf.text(p.name, x + MA.textWidth(lab) + 4, 3, C.W, o);
       buf.text(pad(p.score, 7), x + 54, 3, C.W, o);
       var fr = p.hp / p.maxHp;
       bar(buf, x, 13, 80, fr, fr > 0.5 ? C.Y : fr > 0.25 ? C.O : C.R, C.q);
-      if (!(g.mode === 'play' && !left)) buf.text('x' + p.lives, x + 84, 12, C.W, o);
+      if (!(g.mode === 'play' && !p.human)) buf.text('x' + p.lives, x + 84, 12, C.W, o);
       if (p.human) {
         var sp = 1 - p.ai.spCool / 240;
         buf.rect(x - 1, 19, 82, 3, K);
         buf.rect(x, 20, Math.round(80 * sp), 1, sp >= 1 ? ((g.frame >> 3) % 2 ? C.N : C.w) : C.n);
       }
       var ht = g.hudTarget[p.id];
+      if (!ht && g.mode === 'play' && !p.human && g.pad2 && g.canPause && (g.frame >> 4) % 2 === 0) buf.text('2P PRESS START', x, 22, C.Y, o);
       if (ht && !ht.actor.boss && ht.t % 1 === 0) {
         buf.text(ht.actor.name, x, 22, C.L, o);
         bar(buf, x + 1, 31, 46, Math.max(0, ht.actor.hp) / ht.actor.maxHp, C.P, C.q);

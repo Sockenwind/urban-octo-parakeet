@@ -281,26 +281,39 @@
     } catch (x) { bFull.style.display = 'none'; }
   });
 
-  function pollPad() {
-    var o = {}, gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  // Gamepads: the first controller that presses a button becomes 1P, the second one 2P
+  // (2P joins the game with START and takes over the CPU partner).
+  var padOrder = [];
+  function readPad(gp) {
+    var B = function (k) { return !!(gp.buttons[k] && gp.buttons[k].pressed); };
+    var ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    return {
+      left: ax < -0.45 || B(14), right: ax > 0.45 || B(15), up: ay < -0.45 || B(12), down: ay > 0.45 || B(13),
+      attack: B(2) || B(3), jump: B(0), special: B(1) || B(5) || B(7), start: B(9), quit: B(8) && B(9),
+      any: gp.buttons.some(function (x) { return x && x.pressed; })
+    };
+  }
+  function pollPads() {
+    var gps = navigator.getGamepads ? navigator.getGamepads() : [], live = {}, res = [{}, {}];
     for (var i = 0; i < gps.length; i++) {
-      var gp = gps[i]; if (!gp) continue;
-      var B = function (k) { return gp.buttons[k] && gp.buttons[k].pressed; };
-      var ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
-      o.left = o.left || ax < -0.45 || B(14); o.right = o.right || ax > 0.45 || B(15);
-      o.up = o.up || ay < -0.45 || B(12); o.down = o.down || ay > 0.45 || B(13);
-      o.attack = o.attack || B(2) || B(3); o.jump = o.jump || B(0); o.special = o.special || B(1) || B(5);
-      o.start = o.start || B(9);
-      o.quit = o.quit || (B(8) && B(9));
-      if (B(0) || B(2) || B(9)) firstGesture();
+      var gp = gps[i]; if (!gp || !gp.connected) continue;
+      var key = gp.index + ':' + gp.id, st = readPad(gp);
+      live[key] = st;
+      if (st.any && padOrder.indexOf(key) < 0) padOrder.push(key);
+      if (st.jump || st.attack || st.start) firstGesture();
     }
-    return o;
+    padOrder = padOrder.filter(function (k) { return live[k]; });
+    for (var n = 0; n < 2 && n < padOrder.length; n++) res[n] = live[padOrder[n]];
+    res.count = padOrder.length;
+    return res;
   }
   function readInput() {
-    var I = game.input, gp = pollPad();
-    quitHold = (kiosk && gp.quit) ? quitHold + 1 : 0;
+    var I = game.input, I2 = game.input2, pads = pollPads(), gp = pads[0], g2 = pads[1];
+    var quit = gp.quit || g2.quit;
+    quitHold = (kiosk && quit) ? quitHold + 1 : 0;
     if (quitHold > 75) quitGame();
     if (gp.quit) gp.start = false;
+    if (g2.quit) g2.start = false;
     I.left = held.left || latch.left || stick.x < 0 || gp.left;
     I.right = held.right || latch.right || stick.x > 0 || gp.right;
     I.up = held.up || latch.up || stick.y < 0 || gp.up;
@@ -310,15 +323,10 @@
     I.special = held.special || latch.special || gp.special;
     I.start = held.start || latch.start || gp.start;
     I.tap = tap; game.tapX = tapX;
+    ['left', 'right', 'up', 'down', 'attack', 'jump', 'special', 'start'].forEach(function (k) { I2[k] = !!g2[k]; });
+    game.pad2 = pads.count >= 2;
   }
 
-  // some mobile browsers (iOS) only unlock audio on touchend / click: resume there as well
-  ['touchend', 'click', 'keyup'].forEach(function (ev) {
-    document.addEventListener(ev, function () {
-      if (!SND.ctx) return;
-      if (SND.ctx.state !== 'running' && SND.running) { try { SND.ctx.resume(); } catch (x) { } }
-    }, true);
-  });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden && game.canPause && !game.paused) game.paused = true;
   });
