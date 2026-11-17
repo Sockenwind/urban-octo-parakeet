@@ -22,6 +22,13 @@ Club "THE PIT" → Bosskampf gegen THE PROMOTER → K.O. → STAGE CLEAR → Kon
 
 `demo.html` spielt die automatisch ablaufende Video-Version im Browser ab.
 
+## RetroPie (Raspberry Pi)
+
+Im Ordner `retropie/` liegt ein fertiges Paket: `MRS ANTHROPE.sh` + `mrs-anthrope.html` nach `roms/ports` kopieren
+(Netzwerk: `\\RETROPIE\roms\ports`), EmulationStation neu starten und unter **Ports** starten. Der erste Start
+installiert automatisch einen Kiosk-Browser. Beenden mit SELECT+START. Details: `retropie/LIESMICH.txt`.
+Die HTML-Datei wird mit `python3 tools/build_single.py` aus `index.html` + `js/` erzeugt.
+
 ## Was drin ist
 
 - Echte Low-Res-Grafik: alles wird in **320×180 Pixel** mit fester Palette gezeichnet und dann

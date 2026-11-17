@@ -28,6 +28,9 @@
   #help b { color: var(--cream); }
   #controls { display: none; }
   body.touch #help { display: none; }
+  body.kiosk, body.kiosk * { cursor: none !important; }
+  body.kiosk #help, body.kiosk #controls { display: none !important; }
+  body.kiosk #screen { width: min(100vw, calc(100vh * 16 / 9)); }
   body.touch #screen { width: min(100vw, calc(100vh * 16 / 9)); width: min(100vw, calc(100dvh * 16 / 9)); }
   /* landscape: controls float over the picture */
   body.touch #controls { display: flex; position: absolute; left: 0; right: 0; bottom: 0; justify-content: space-between; align-items: flex-end;
@@ -115,7 +118,21 @@
   // ------------------------------------------------------------ touch detection
   var isTouch = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
   function setTouch(on) { document.body.classList.toggle('touch', on); }
+  var kiosk = /^#(pi|kiosk|retropie)$/i.test(location.hash);
+  if (kiosk) { document.body.classList.add('kiosk'); isTouch = false; }
   setTouch(isTouch);
+  // kiosk mode (RetroPie): hold SELECT+START (or press F10) to quit back to EmulationStation.
+  // The launcher script watches the window title and closes the browser.
+  var quitHold = 0, quitting = false;
+  function quitGame() {
+    if (quitting) return;
+    quitting = true;
+    document.title = 'MRS-ANTHROPE-QUIT';
+    try { SND.music(null); SND.setMuted(true); } catch (x) { }
+    document.getElementById('bootTxt').textContent = 'BYE!';
+    document.getElementById('bar').style.display = 'none';
+    document.getElementById('boot').style.display = 'flex';
+  }
   window.addEventListener('touchstart', function () { if (!document.body.classList.contains('touch')) setTouch(true); }, { passive: true });
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -243,6 +260,7 @@
   };
   window.addEventListener('keydown', function (e) {
     if (e.code === 'KeyM') { firstGesture(); SND.setMuted(!SND.muted); return; }
+    if (kiosk && e.code === 'F10') { e.preventDefault(); quitGame(); return; }
     var b = KEYS[e.code]; if (!b) return;
     e.preventDefault(); firstGesture();
     if (!e.repeat) press(b); else held[b] = true;
@@ -273,12 +291,16 @@
       o.up = o.up || ay < -0.45 || B(12); o.down = o.down || ay > 0.45 || B(13);
       o.attack = o.attack || B(2) || B(3); o.jump = o.jump || B(0); o.special = o.special || B(1) || B(5);
       o.start = o.start || B(9);
+      o.quit = o.quit || (B(8) && B(9));
       if (B(0) || B(2) || B(9)) firstGesture();
     }
     return o;
   }
   function readInput() {
     var I = game.input, gp = pollPad();
+    quitHold = (kiosk && gp.quit) ? quitHold + 1 : 0;
+    if (quitHold > 75) quitGame();
+    if (gp.quit) gp.start = false;
     I.left = held.left || latch.left || stick.x < 0 || gp.left;
     I.right = held.right || latch.right || stick.x > 0 || gp.right;
     I.up = held.up || latch.up || stick.y < 0 || gp.up;

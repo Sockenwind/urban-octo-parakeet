@@ -1,0 +1,31 @@
+MRS. ANTHROPE - Road to the Gig  |  Installation auf RetroPie
+==============================================================
+
+Was du brauchst: RetroPie (am besten Raspberry Pi 4 oder 5), Internet am Pi
+(nur fuer den ersten Start) und ein Gamepad (oder Tastatur).
+
+1. Die beiden Dateien
+      MRS ANTHROPE.sh
+      mrs-anthrope.html
+   in den Ordner  roms/ports  auf dem Pi kopieren.
+   - Am PC im Netzwerk:  \\RETROPIE\roms\ports   (Windows-Explorer)
+                         smb://retropie/roms/ports (Mac: Finder > Gehe zu > Mit Server verbinden)
+   - Oder per USB-Stick / SSH nach  /home/pi/RetroPie/roms/ports/
+
+2. EmulationStation neu starten:
+   START-Taste > QUIT > RESTART EMULATIONSTATION
+
+3. In EmulationStation "PORTS" > "MRS ANTHROPE" starten.
+   Beim allerersten Start wird automatisch ein Browser installiert
+   (dauert ein paar Minuten, danach nie wieder).
+
+Steuerung (Gamepad):  Steuerkreuz/Stick = laufen,  X/Y = Schlag (3x = Combo),
+                      A = Sprung (in der Luft Schlag = Flugkick),  B/R = Spezial,
+                      START = Start/Pause
+Beenden:              SELECT + START etwa 1 Sekunde gedrueckt halten
+Tastatur:             Pfeile, J = Schlag, K = Sprung, L = Spezial, Enter = Start, F10 = Beenden
+
+Tipps
+- Beim ersten Knopfdruck im Titelbild werden die Sounds erzeugt (kurzer Ladebalken).
+- Auf einem Raspberry Pi 3 kann es ruckeln; Pi 4/5 laeuft fluessig.
+- Bei Problemen steht ein Log in /dev/shm/mrs-anthrope.log
