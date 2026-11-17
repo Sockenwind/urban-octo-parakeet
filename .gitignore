@@ -3,3 +3,4 @@ __pycache__/
 build/
 dist/
 *.spec
+mrs-anthrope-game/out/soundtrack.wav

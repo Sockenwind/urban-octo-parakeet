@@ -1,0 +1,44 @@
+MRS. ANTHROPE - Road to the Gig  |  Installation auf RetroPie
+==============================================================
+
+Was du brauchst: RetroPie (am besten Raspberry Pi 4 oder 5), Internet am Pi
+(nur fuer den ersten Start) und ein Gamepad (oder Tastatur).
+
+1. Die beiden Dateien
+      MRS ANTHROPE.sh
+      mrs-anthrope.html
+   in den Ordner  roms/ports  auf dem Pi kopieren.
+   - Am PC im Netzwerk:  \\RETROPIE\roms\ports   (Windows-Explorer)
+                         smb://retropie/roms/ports (Mac: Finder > Gehe zu > Mit Server verbinden)
+   - Oder per USB-Stick / SSH nach  /home/pi/RetroPie/roms/ports/
+
+2. EmulationStation neu starten:
+   START-Taste > QUIT > RESTART EMULATIONSTATION
+
+3. In EmulationStation "PORTS" > "MRS ANTHROPE" starten.
+   Beim allerersten Start wird automatisch ein Browser installiert
+   (dauert ein paar Minuten, danach nie wieder).
+
+Controller
+- Das Spiel liest die Gamepads selbst (USB oder Bluetooth). Die Tastenbelegung aus
+  EmulationStation/RetroArch wird dabei NICHT verwendet - es ist nichts einzustellen.
+- Der Controller, auf dem zuerst eine Taste gedrueckt wird, ist Spieler 1.
+- 2 SPIELER: Waehrend des Spiels auf dem zweiten Controller START druecken -
+  2P steigt ein und uebernimmt die CPU-Figur. Hat 2P keine Leben mehr, spielt
+  die CPU weiter, mit START kann 2P wieder einsteigen.
+
+Steuerung (Gamepad):  Steuerkreuz/Stick = laufen,  X/Y = Schlag (3x = Combo),
+                      A = Sprung (in der Luft Schlag = Flugkick),  B/R = Spezial,
+                      START = Start/Pause (2. Controller: Einsteigen)
+Beenden:              SELECT + START etwa 1 Sekunde gedrueckt halten
+Tastatur:             Pfeile, J = Schlag, K = Sprung, L = Spezial, Enter = Start, F10 = Beenden
+                      (Tastatur steuert immer Spieler 1)
+
+Bei sehr guenstigen USB-Gamepads (SNES-Nachbauten) sind die Tasten manchmal anders
+vertauscht - dann einfach ausprobieren: jede der vier Aktionstasten loest
+Schlag, Sprung oder Spezial aus.
+
+Tipps
+- Beim ersten Knopfdruck im Titelbild werden die Sounds erzeugt (kurzer Ladebalken).
+- Auf einem Raspberry Pi 3 kann es ruckeln; Pi 4/5 laeuft fluessig.
+- Bei Problemen steht ein Log in /dev/shm/mrs-anthrope.log
