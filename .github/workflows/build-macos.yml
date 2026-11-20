@@ -1,0 +1,58 @@
+name: KlarBild für macOS bauen
+
+on:
+  push:
+    branches: [klarbild]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-apple-silicon:
+    runs-on: macos-14            # Apple Silicon (arm64)
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: ffmpeg mit vid.stab portabel machen
+        run: ./tools/bundle_ffmpeg_macos.sh
+
+      - name: Python-Pakete
+        run: python -m pip install -r requirements.txt pytest pyinstaller pillow
+
+      - name: Tests (mit dem eingepackten ffmpeg)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          export PATH="$PWD/vendor:$PATH"
+          python -m pytest -q
+
+      - name: App bauen
+        run: ./build_app.sh
+
+      - name: Selbsttest der fertigen App – mit verstecktem Homebrew
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          sudo mv /opt/homebrew /opt/homebrew-versteckt
+          ./dist/KlarBild.app/Contents/MacOS/KlarBild --selftest | tee selftest.log
+          sudo mv /opt/homebrew-versteckt /opt/homebrew
+          grep -q "Frameworks/bin/ffmpeg" selftest.log
+          grep -Eq "vid\.stab: +ja" selftest.log
+          grep -q "SELBSTTEST OK" selftest.log
+
+      - name: Packen
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent dist/KlarBild.app KlarBild-macOS-AppleSilicon.zip
+          ls -lh KlarBild-macOS-AppleSilicon.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KlarBild-macOS-AppleSilicon
+          path: KlarBild-macOS-AppleSilicon.zip
+          retention-days: 30

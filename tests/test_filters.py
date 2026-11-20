@@ -1,0 +1,82 @@
+"""Filterketten: richtige Filter in richtiger Reihenfolge, Ersatzfilter ohne vid.stab/fftdnoiz."""
+from dataclasses import replace
+
+from klarbild.audio_filters import audio_chain, loudnorm_apply_filter, parse_loudnorm
+from klarbild.ffmpeg_tools import MediaInfo
+from klarbild.settings import AudioSettings, JobSettings, VideoSettings
+from klarbild.video_filters import build_video_plan, target_size
+
+MEDIA = MediaInfo(path="x.mp4", duration=10, has_video=True, has_audio=True, width=1920, height=1080, fps=25)
+
+
+def test_default_plan_order(ff):
+    plan = build_video_plan(ff, VideoSettings(), MEDIA, interlaced=True)
+    chain = plan.main
+    assert chain.index("bwdif") < chain.index("fftdnoiz") < chain.index("vidstabtransform") < chain.index("cas")
+    assert "vidstabdetect" in plan.detect and "vidstabtransform" not in plan.detect
+    assert "vidstab" not in plan.preview          # Einzelbild-Vorschau ohne Stabilisierung
+    assert plan.pre.startswith("bwdif")
+
+
+def test_denoise_methods(ff):
+    for method, needle in (("fast", "hqdn3d"), ("balanced", "fftdnoiz"), ("max", "overlap=0.75")):
+        plan = build_video_plan(ff, VideoSettings(denoise_method=method, stabilize_enabled=False), MEDIA, False)
+        assert needle in plan.main
+        assert plan.detect is None
+
+
+def test_everything_off_is_null(ff):
+    vs = VideoSettings(denoise_enabled=False, stabilize_enabled=False, sharpen=0)
+    plan = build_video_plan(ff, vs, MEDIA, False)
+    assert plan.main == "null" and plan.preview == "null"
+
+
+def test_fallbacks_without_vidstab_and_fftdnoiz(ff):
+    poor = replace(ff, filters=frozenset(f for f in ff.filters if not f.startswith("vidstab") and f != "fftdnoiz"))
+    plan = build_video_plan(poor, VideoSettings(), MEDIA, False)
+    assert "deshake" in plan.main and "hqdn3d" in plan.main
+    assert plan.detect is None
+    assert len(plan.notes) == 2
+
+
+def test_tripod_and_borders(ff):
+    plan = build_video_plan(ff, VideoSettings(stabilize_mode="tripod", stabilize_border="black"), MEDIA, False)
+    assert "tripod=1" in plan.detect and "tripod=1" in plan.main and "crop=black" in plan.main
+
+
+def test_resolution_uses_short_side():
+    portrait = replace(MEDIA, width=1080, height=1920)
+    assert target_size(VideoSettings(resolution="720"), MEDIA) == (1280, 720)
+    assert target_size(VideoSettings(resolution="720"), portrait) == (720, 1280)
+    assert target_size(VideoSettings(), MEDIA) == (1920, 1080)
+
+
+def test_audio_chain(ff):
+    a = AudioSettings(hum="50", declick=True, declip=True, voice=True, compress=50, denoise=40)
+    chain = audio_chain(ff, a)
+    joined = ",".join(chain)
+    for needle in ("adeclip", "adeclick", "bandreject=f=50", "bandreject=f=250", "highpass=f=100",
+                   "afftdn", "equalizer", "deesser", "acompressor"):
+        assert needle in joined
+    assert audio_chain(ff, AudioSettings(enabled=False)) == []
+    assert audio_chain(ff, AudioSettings(mute=True)) == []
+
+
+def test_loudnorm_parsing():
+    log = 'blah\n[Parsed_loudnorm_0 @ 0x1]\n{\n "input_i" : "-27.5",\n "input_tp" : "-9.1",\n' \
+          ' "input_lra" : "6.2",\n "input_thresh" : "-38.0",\n "target_offset" : "0.3"\n}\n'
+    m = parse_loudnorm(log)
+    assert m["input_i"] == "-27.5"
+    f = loudnorm_apply_filter(-16, m, 48000)
+    assert "measured_I=-27.5" in f and "linear=true" in f and f.endswith("aresample=48000")
+    silent = log.replace('"-27.5"', '"-inf"')
+    assert parse_loudnorm(silent) is None
+
+
+def test_settings_roundtrip():
+    js = JobSettings()
+    js.video.denoise_strength = 77
+    js.audio.hum = "60"
+    back = JobSettings.from_dict(js.to_dict())
+    assert back.video.denoise_strength == 77 and back.audio.hum == "60"
+    assert JobSettings.from_dict({"video": {"unbekannt": 1}}).video.denoise_strength == 40
