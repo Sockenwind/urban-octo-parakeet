@@ -76,11 +76,17 @@ class FFmpegInfo:
         return "h264_videotoolbox" in self.encoders
 
 
+# Die Markierungsspalten ändern sich zwischen ffmpeg-Versionen (6.x: „TSC“, ab 7: „TS“).
+# Deshalb nur an der Form der Zeile erkennen, nicht an der genauen Spaltenbreite.
+_FLAGS = re.compile(r"[A-Z.|]{1,8}")
+_IO = re.compile(r"[AVN|]*->[AVN|]*")
+
+
 def _parse_filters(text: str) -> set:
     names = set()
     for line in text.splitlines():
         parts = line.split()
-        if len(parts) >= 3 and "->" in parts[2] and re.fullmatch(r"[T.][S.][C.]", parts[0]):
+        if len(parts) >= 3 and _FLAGS.fullmatch(parts[0]) and _IO.fullmatch(parts[2]):
             names.add(parts[1])
     return names
 
@@ -89,7 +95,8 @@ def _parse_encoders(text: str) -> set:
     names = set()
     for line in text.splitlines():
         parts = line.split()
-        if len(parts) >= 2 and parts[1] != "=" and re.fullmatch(r"[VAS][F.][S.][X.][B.][D.]", parts[0]):
+        if (len(parts) >= 3 and parts[1] != "=" and parts[0][:1] in "VAS"
+                and _FLAGS.fullmatch(parts[0]) and not parts[0].startswith("-")):
             names.add(parts[1])
     return names
 
@@ -306,9 +313,13 @@ class CancelToken:
             raise Cancelled()
 
 
+_ERROR_HINT = re.compile(r"error|invalid|must|failed|cannot|unknown|not found|no such|unable", re.I)
+
+
 def _summarize(log: str) -> str:
     lines = [ln.strip() for ln in log.splitlines() if ln.strip()]
-    return "\n".join(lines[-6:]) or "ffmpeg ist ohne Meldung fehlgeschlagen"
+    errors = [ln for ln in lines if _ERROR_HINT.search(ln)]
+    return "\n".join((errors or lines)[-4:]) or "ffmpeg ist ohne Meldung fehlgeschlagen"
 
 
 def run_ffmpeg(

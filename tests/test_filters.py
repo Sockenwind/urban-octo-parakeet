@@ -39,6 +39,57 @@ def test_fallbacks_without_vidstab_and_fftdnoiz(ff):
     assert len(plan.notes) == 2
 
 
+FILTERS_V6 = """Filters:
+  T.. = Timeline support
+  .S. = Slice threading
+  ..C = Command support
+ ... abench            A->A       Benchmark part of a filtergraph.
+ TSC fftdnoiz          V->V       Denoise frames using 3D FFT.
+ ... vidstabdetect     V->V       Extract relative transformations.
+ ... amix              N->A       Audio mixing.
+ ... anoisesrc         |->A       Generate a noise audio signal.
+"""
+FILTERS_V7 = """Filters:
+  T. = Timeline support
+  .S = Slice threading
+  A = Audio input/output
+ .. abench            A->A       Benchmark part of a filtergraph.
+ TS fftdnoiz          V->V       Denoise frames using 3D FFT.
+ .. vidstabdetect     V->V       Extract relative transformations.
+ .. amix              N->A       Audio mixing.
+ .. anoisesrc         |->A       Generate a noise audio signal.
+"""
+ENCODERS = """Encoders:
+ V..... = Video
+ A..... = Audio
+ ------
+ V....D libx264              libx264 H.264 / AVC
+ VFS... prores_ks            Apple ProRes
+ A....D aac                  AAC (Advanced Audio Coding)
+"""
+
+
+def test_parsers_old_and_new_ffmpeg():
+    from klarbild.ffmpeg_tools import _parse_encoders, _parse_filters
+    expected = {"abench", "fftdnoiz", "vidstabdetect", "amix", "anoisesrc"}
+    assert _parse_filters(FILTERS_V6) == expected
+    assert _parse_filters(FILTERS_V7) == expected
+    assert _parse_encoders(ENCODERS) == {"libx264", "prores_ks", "aac"}
+
+
+def test_real_ffmpeg_detection_is_plausible(ff):
+    assert len(ff.filters) > 200 and len(ff.encoders) > 50
+    assert {"hqdn3d", "loudnorm", "afftdn", "scale"} <= ff.filters
+
+
+def test_deshake_ranges_are_multiples_of_16():
+    import re
+    from klarbild.video_filters import deshake_filter
+    for st in range(0, 101, 5):
+        r = int(re.search(r"rx=(\d+)", deshake_filter(VideoSettings(stabilize_strength=st))).group(1))
+        assert r % 16 == 0 and 16 <= r <= 64
+
+
 def test_tripod_and_borders(ff):
     plan = build_video_plan(ff, VideoSettings(stabilize_mode="tripod", stabilize_border="black"), MEDIA, False)
     assert "tripod=1" in plan.detect and "tripod=1" in plan.main and "crop=black" in plan.main

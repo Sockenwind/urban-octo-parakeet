@@ -100,7 +100,7 @@ def stab_transform_filter(vs: VideoSettings, trf: str = TRF_NAME) -> str:
 def deshake_filter(vs: VideoSettings) -> str:
     """Einfacher Ersatz, falls ffmpeg ohne vid.stab gebaut wurde."""
     s = _s(vs.stabilize_strength)
-    r = min(64, round(16 + 48 * s))
+    r = min(64, 16 * round(1 + 3 * s))           # deshake verlangt Vielfache von 16
     edge = "blank" if vs.stabilize_border == "black" else "mirror"
     return f"deshake=rx={r}:ry={r}:edge={edge}"
 
