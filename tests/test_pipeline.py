@@ -60,8 +60,12 @@ def test_every_format(ff, shaky, tmp_path, fmt):
     ex = ExportSettings(format=fmt, quality="small", folder=str(tmp_path))
     out = output_path(shaky.path, FORMATS[fmt], ex.folder, ex.suffix)
     seen = []
-    result = run_job(ff, Job(shaky.path, out, JobSettings(), ex, shaky, duration=2.0),
-                     on_progress=lambda f, t: seen.append(f))
+    try:
+        result = run_job(ff, Job(shaky.path, out, JobSettings(), ex, shaky, duration=2.0),
+                         on_progress=lambda f, t: seen.append(f))
+    except PipelineError as exc:
+        print(exc.log[-4000:])          # erscheint bei einem Fehlschlag im Testbericht
+        raise
     assert os.path.getsize(result) > 1000
     kinds = {s["codec_type"]: s for s in streams(result)}
     assert "audio" in kinds
@@ -81,6 +85,21 @@ def test_audio_fallback_format():
     assert format_for("mkv_ffv1", False) == "audio_flac"
     assert format_for("mp4_h264", True) == "mp4_h264"
     assert format_for("audio_mp3", False) == "audio_mp3"
+
+
+def test_flac_is_24_bit(ff, shaky, tmp_path):
+    out = str(tmp_path / "ton.flac")
+    run_job(ff, Job(shaky.path, out, JobSettings(), ExportSettings(format="audio_flac"), shaky, duration=1.0))
+    info = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=bits_per_raw_sample,sample_fmt",
+                           "-of", "json", out], capture_output=True, text=True, check=True).stdout
+    assert json.loads(info)["streams"][0]["bits_per_raw_sample"] == "24"
+
+
+def test_error_summary_names_the_cause():
+    from klarbild.ffmpeg_tools import _summarize
+    log = ("Input #0 ...\n[flac @ 0x1] encoding as 32 bits-per-sample is experimental\n"
+           "[af#0:0 @ 0x2] Terminating thread with return code -22 (Invalid argument)\nConversion failed!\n")
+    assert _summarize(log).startswith("[flac @ 0x1] encoding as 32")
 
 
 def test_output_names_never_overwrite(tmp_path):

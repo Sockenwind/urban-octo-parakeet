@@ -120,6 +120,9 @@ def audio_encoder_args(ff: FFmpegInfo, fmt: ExportFormat, quality: str) -> list:
         return ["-c:a", "libvorbis", "-q:a", {"high": "7", "medium": "5", "small": "3"}[quality]]
     if codec == "libmp3lame":
         return ["-c:a", "libmp3lame", "-q:a", {"high": "0", "medium": "2", "small": "5"}[quality]]
+    if codec == "flac":
+        # Neuere ffmpeg-Versionen wählen nach Fließkomma-Filtern sonst 32 Bit – das gilt bei FLAC als experimentell
+        return ["-c:a", "flac", "-sample_fmt", "s32", "-bits_per_raw_sample", "24"]
     return ["-c:a", codec]
 
 

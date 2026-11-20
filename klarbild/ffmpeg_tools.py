@@ -313,13 +313,20 @@ class CancelToken:
             raise Cancelled()
 
 
-_ERROR_HINT = re.compile(r"error|invalid|must|failed|cannot|unknown|not found|no such|unable", re.I)
+_ERROR_HINT = re.compile(r"error|invalid|must|failed|cannot|unknown|not found|no such|unable|experimental|"
+                         r"not supported|unsupported", re.I)
+# Folgemeldungen, die ffmpeg nach dem eigentlichen Fehler ausgibt – sagen nichts über die Ursache
+_ERROR_NOISE = re.compile(r"Terminating thread|Task finished with error|Conversion failed|Error opening output|"
+                          r"Nothing was written|Error while (filtering|processing)|Error sending frames", re.I)
 
 
 def _summarize(log: str) -> str:
+    """Die ersten ursächlichen Fehlerzeilen, sonst die letzten Zeilen des Protokolls."""
     lines = [ln.strip() for ln in log.splitlines() if ln.strip()]
-    errors = [ln for ln in lines if _ERROR_HINT.search(ln)]
-    return "\n".join((errors or lines)[-4:]) or "ffmpeg ist ohne Meldung fehlgeschlagen"
+    causes = [ln for ln in lines if _ERROR_HINT.search(ln) and not _ERROR_NOISE.search(ln)]
+    if causes:
+        return "\n".join(causes[:3])
+    return "\n".join(lines[-4:]) or "ffmpeg ist ohne Meldung fehlgeschlagen"
 
 
 def run_ffmpeg(
