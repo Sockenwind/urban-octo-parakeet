@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from .analysis import Analysis
-from .audio_filters import (audio_chain, loudnorm_apply_filter, loudnorm_measure_filter,
+from .audio_filters import (audio_chain, finish_chain, loudnorm_apply_filter, loudnorm_measure_filter,
                             output_sample_rate, parse_loudnorm)
 from .exporters import (FORMATS, ExportError, audio_codec_for, audio_encoder_args, container_args,
                         video_encoder_args)
@@ -170,7 +170,7 @@ def _encode(ff, job, fmt, plan, achain, want_video, want_audio, quality, src, ou
     if want_audio:
         aargs = ["-map", "0:a:0"]
         if achain:
-            aargs += ["-af", ",".join(achain)]
+            aargs += ["-af", ",".join(finish_chain(achain))]
         aargs += audio_encoder_args(ff, fmt, quality)
         if audio_codec_for(ff, fmt) in ("libopus", "opus"):
             aargs += ["-ar", "48000"]

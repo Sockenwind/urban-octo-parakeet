@@ -95,6 +95,13 @@ def parse_loudnorm(log: str) -> Optional[dict]:
         return None
 
 
+def finish_chain(chain: list) -> list:
+    """loudnorm gibt seinen Puffer (mehrere Sekunden) als einen einzigen Block weiter. Ab ffmpeg 8
+    reicht ffmpeg solche Blöcke unverändert an den Encoder – FLAC erlaubt aber höchstens 65 535
+    Samples pro Block. Deshalb am Ende in handliche Blöcke aufteilen."""
+    return chain + ["asetnsamples=n=4096:p=0"] if chain else chain
+
+
 def output_sample_rate(source_rate: int, codec: str) -> int:
     if codec in ("libopus", "opus"):
         return 48000

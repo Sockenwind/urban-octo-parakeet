@@ -113,6 +113,12 @@ def test_audio_chain(ff):
     assert audio_chain(ff, AudioSettings(mute=True)) == []
 
 
+def test_audio_chain_is_split_into_small_blocks():
+    from klarbild.audio_filters import finish_chain
+    assert finish_chain(["highpass=f=75"])[-1].startswith("asetnsamples=n=4096")
+    assert finish_chain([]) == []
+
+
 def test_loudnorm_parsing():
     log = 'blah\n[Parsed_loudnorm_0 @ 0x1]\n{\n "input_i" : "-27.5",\n "input_tp" : "-9.1",\n' \
           ' "input_lra" : "6.2",\n "input_thresh" : "-38.0",\n "target_offset" : "0.3"\n}\n'
